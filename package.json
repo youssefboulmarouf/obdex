@@ -1,0 +1,22 @@
+{
+  "name": "obdex",
+  "version": "1.0.0",
+  "description": "Order Book Decentralized Exchange",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/youssefboulmarouf/obdex.git"
+  },
+  "author": "Youssef Boulmarouf",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/youssefboulmarouf/obdex/issues"
+  },
+  "homepage": "https://github.com/youssefboulmarouf/obdex#readme"
+}
