@@ -125,14 +125,15 @@ contract OBDex {
 
     // --- Create Limit Order ---
     function createOrder(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE _side, ORDER_TYPE _type) 
-        external {
+        external tokenExist(_ticker) notDai(_ticker) hasEnoughTokenToSell(_ticker, _amount, _side) 
+        hasEnoughDaiToBuy(_amount, _price, _side, _type) ordersExists(_ticker, _side, _type) {
         
         if (_type == ORDER_TYPE.LIMIT) {
 
         } else if (_type == ORDER_TYPE.MARKET) {
 
         } else {
-            revert();
+            revert("Only Limit And Market Orders Are Allowed!");
         }
     }
 
@@ -148,9 +149,45 @@ contract OBDex {
         _;
     }
 
+    // --- Modifier: Token Should Not Be DAI ---
+    modifier notDai(bytes32 ticker) {
+        require(ticker != DAI, "Cannot Trade DAI Token!");
+        _;
+    }
+
     // --- Modifier: Trader Should Have Enough Balance For Action ---
     modifier hasEnoughBalance(bytes32 ticker, uint amount) {
         require(balances[msg.sender][ticker].free >= amount, "Low Token Balance!");
         _;
     }
+
+    // --- Modifier: Trader Should Have Enough Token Balance To Sell ---
+    modifier hasEnoughTokenToSell(bytes32 ticker, uint amount, ORDER_SIDE side) {
+        if (side == ORDER_SIDE.SELL) {
+            require(balances[msg.sender][ticker].free >= amount, "Low Token Balance!!!");
+        }
+        _;
+    }
+
+    // --- Modifier: Trader Should Have Enough DAI Balance To Buy ---
+    modifier hasEnoughDaiToBuy(uint _amount, uint _price, ORDER_SIDE _side, ORDER_TYPE _type) {
+        // This should ONLY be checked on LIMIT orders 
+        // since we know the exact amount and price
+        // which is not the case in MARKET orders
+        if (_side == ORDER_SIDE.BUY &&_type == ORDER_TYPE.LIMIT) {
+            require(balances[msg.sender][DAI].free >= SafeMath.mul(_amount, _price), "Low DAI Balance!!!");
+        }
+        _;
+    }
+
+    // --- Modifier: Orders Should Exist To Open Market Orders ---
+    modifier ordersExists(bytes32 _ticker, ORDER_SIDE _side, ORDER_TYPE _type) {
+        // This should ONLY be checked on MARKET orders 
+        // since we need orders to match against
+        if (_type == ORDER_TYPE.MARKET) {
+            Order[] memory orders = orderBook[_ticker][uint(_side == ORDER_SIDE.BUY ? ORDER_SIDE.SELL : ORDER_SIDE.BUY)];
+            require(orders.length > 0, "Empty Order Book! Please Create Limit Order!");
+        }
+        _;
+    }    
 }
