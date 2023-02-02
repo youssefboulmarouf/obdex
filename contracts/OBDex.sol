@@ -46,4 +46,23 @@ contract OBDex {
         uint date
     );
 
+    // Variables
+    address public admin; // Contract owner
+    bytes32[] public tickerList; 
+    mapping(bytes32 => Token) public tokens;
+    mapping(address => mapping(bytes32 => Balance)) public balances;
+    mapping(bytes32 => mapping(uint => Order[])) public orderBook;
+    uint public nextOrderId; // Order id tracker
+    uint public nextTradeId; // Trader id tracker
+
+
+    // Contract constructor
+    constructor() { admin = msg.sender; }
+
+
+    // Access Controle
+    modifier onlyAdmin() {
+        require(admin == msg.sender, "Unauthorized! Only Admin can perform this action.");
+        _;
+    }
 }
