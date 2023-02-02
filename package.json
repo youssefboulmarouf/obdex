@@ -14,9 +14,15 @@
     "url": "git+https://github.com/youssefboulmarouf/obdex.git"
   },
   "author": "Youssef Boulmarouf",
-  "license": "MIT",
+  "license": "ISC",
   "bugs": {
     "url": "https://github.com/youssefboulmarouf/obdex/issues"
   },
-  "homepage": "https://github.com/youssefboulmarouf/obdex#readme"
+  "homepage": "https://github.com/youssefboulmarouf/obdex#readme",
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.7.3",
+    "@openzeppelin/test-helpers": "^0.5.16",
+    "@truffle/hdwallet-provider": "^2.1.0",
+    "hardhat-console": "^1.0.0"
+  }
 }
