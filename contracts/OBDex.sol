@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import '../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '../node_modules/@openzeppelin/contracts/utils/math/SafeMath.sol';
 
 contract OBDex {
@@ -93,10 +94,34 @@ contract OBDex {
         return orderBook[ticker][uint(side)];
     }
 
+    // --- Deposit Tokens ---
+    function deposit(bytes32 ticker, uint amount) external tokenExist(ticker) { 
+        // TODO: Add check for ERC20 token
+        IERC20(tokens[ticker].tokenAddress).transferFrom(msg.sender, address(this), amount);
+        balances[msg.sender][ticker].free = balances[msg.sender][ticker].free.add(amount);
+    }
 
-    // --- Access Controle ---
+    // --- Withdraw Tokens ---
+    function withdraw(bytes32 ticker, uint amount) external tokenExist(ticker) hasEnoughBalance(ticker, amount) {
+        IERC20(tokens[ticker].tokenAddress).transfer(msg.sender, amount);
+        balances[msg.sender][ticker].free = balances[msg.sender][ticker].free.sub(amount);
+    }
+
+    // --- Modifier: Admin Access Controle ---
     modifier onlyAdmin() {
         require(admin == msg.sender, "Unauthorized! Only Admin can perform this action.");
+        _;
+    }
+
+    // --- Modifier: Token Should Exist ---
+    modifier tokenExist(bytes32 ticker) {
+        require(tokens[ticker].tokenAddress != address(0), "Ticker Does Not Exist!");
+        _;
+    }
+
+    // --- Modifier: Trader Should Have Enough Balace For Action ---
+    modifier hasEnoughBalance(bytes32 ticker, uint amount) {
+        require(balances[msg.sender][ticker].free >= amount, "Not Enough Balance!");
         _;
     }
 }
