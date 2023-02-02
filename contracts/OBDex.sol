@@ -59,6 +59,40 @@ contract OBDex {
     // --- Contract Constructor ---
     constructor() { admin = msg.sender; }
 
+    // --- Add Token ---
+    function addToken(bytes32 _ticker, address _tokenAddress) external onlyAdmin() {
+        tokens[_ticker] = Token(_ticker, _tokenAddress); 
+        tickerList.push(_ticker);
+    }
+
+    // --- Get Tokens ---
+    function getTokens() external view returns(Token[] memory) {
+        // Since we can't return a mipping in Solidity
+        // We have to convert the Tokens mapping to Token List
+
+        // Creating a memory list of Tokens
+        Token[] memory _tokens = new Token[](tickerList.length);
+
+        // Populating the list a memory list of Tokens
+        for (uint i = 0; i < tickerList.length; i++) {
+            bytes32 currentTicker = tickerList[i];
+            address tokenAddress = tokens[currentTicker].tokenAddress;
+            _tokens[i] = Token(currentTicker, tokenAddress);
+        }
+
+        return _tokens;
+    }
+
+    // --- Get Ticker List ---
+    function getTickerList() external view returns(bytes32[] memory) {
+        return tickerList;
+    }
+
+    // --- Get Orders ---
+    function getOrders(bytes32 ticker, ORDER_SIDE side) external view returns(Order[] memory) {
+        return orderBook[ticker][uint(side)];
+    }
+
 
     // --- Access Controle ---
     modifier onlyAdmin() {
