@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import '../node_modules/@openzeppelin/contracts/utils/math/SafeMath.sol';
+
 contract OBDex {
+    using SafeMath for uint;
 
     // Enums
     enum ORDER_SIDE { BUY, SELL }
     enum ORDER_TYPE { MARKET, LIMIT }
 
-    // struct
+    // Structs
     struct Balance { 
         uint free; // Free balance
         uint locked; // Locked balance for orders in the order book
@@ -42,7 +45,5 @@ contract OBDex {
         uint price, 
         uint date
     );
-
-    
 
 }
