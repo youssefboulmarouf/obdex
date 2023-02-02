@@ -57,17 +57,23 @@ contract OBDex {
     mapping (address => mapping (bytes32 => Balance))   public balances;
     mapping (bytes32 => mapping (uint => Order[]))      public orderBook;
     
+    bytes32 constant DAI = bytes32("DAI");
+
     // --- Contract Constructor ---
     constructor() { admin = msg.sender; }
 
     // --- Add Token ---
-    function addToken(bytes32 _ticker, address _tokenAddress) external onlyAdmin() {
+    function addToken(bytes32 _ticker, address _tokenAddress) 
+        external onlyAdmin() {
+
         tokens[_ticker] = Token(_ticker, _tokenAddress); 
         tickerList.push(_ticker);
     }
 
     // --- Get Tokens ---
-    function getTokens() external view returns(Token[] memory) {
+    function getTokens() 
+        external view returns(Token[] memory) {
+
         // Since we can't return a mipping in Solidity
         // We have to convert the Tokens mapping to Token List
 
@@ -85,26 +91,49 @@ contract OBDex {
     }
 
     // --- Get Ticker List ---
-    function getTickerList() external view returns(bytes32[] memory) {
+    function getTickerList() 
+        external view returns(bytes32[] memory) {
+        
         return tickerList;
     }
 
     // --- Get Orders ---
-    function getOrders(bytes32 ticker, ORDER_SIDE side) external view returns(Order[] memory) {
-        return orderBook[ticker][uint(side)];
+    function getOrders(bytes32 _ticker, ORDER_SIDE _side) 
+        external view returns(Order[] memory) {
+        
+        return orderBook[_ticker][uint(_side)];
     }
 
     // --- Deposit Tokens ---
-    function deposit(bytes32 ticker, uint amount) external tokenExist(ticker) { 
+    function deposit(bytes32 _ticker, uint _amount) 
+        external tokenExist(_ticker) { 
+
         // TODO: Add check for ERC20 token
-        IERC20(tokens[ticker].tokenAddress).transferFrom(msg.sender, address(this), amount);
-        balances[msg.sender][ticker].free = balances[msg.sender][ticker].free.add(amount);
+        IERC20 token = IERC20(tokens[_ticker].tokenAddress);
+        token.transferFrom(msg.sender, address(this), _amount);
+        balances[msg.sender][_ticker].free = balances[msg.sender][_ticker].free.add(_amount);
     }
 
     // --- Withdraw Tokens ---
-    function withdraw(bytes32 ticker, uint amount) external tokenExist(ticker) hasEnoughBalance(ticker, amount) {
-        IERC20(tokens[ticker].tokenAddress).transfer(msg.sender, amount);
-        balances[msg.sender][ticker].free = balances[msg.sender][ticker].free.sub(amount);
+    function withdraw(bytes32 _ticker, uint _amount) 
+        external tokenExist(_ticker) hasEnoughBalance(_ticker, _amount) {
+
+        IERC20 token = IERC20(tokens[_ticker].tokenAddress);
+        balances[msg.sender][_ticker].free = balances[msg.sender][_ticker].free.sub(_amount);
+        token.transfer(msg.sender, _amount);
+    }
+
+    // --- Create Limit Order ---
+    function createOrder(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE _side, ORDER_TYPE _type) 
+        external {
+        
+        if (_type == ORDER_TYPE.LIMIT) {
+
+        } else if (_type == ORDER_TYPE.MARKET) {
+
+        } else {
+            revert();
+        }
     }
 
     // --- Modifier: Admin Access Controle ---
@@ -119,9 +148,9 @@ contract OBDex {
         _;
     }
 
-    // --- Modifier: Trader Should Have Enough Balace For Action ---
+    // --- Modifier: Trader Should Have Enough Balance For Action ---
     modifier hasEnoughBalance(bytes32 ticker, uint amount) {
-        require(balances[msg.sender][ticker].free >= amount, "Not Enough Balance!");
+        require(balances[msg.sender][ticker].free >= amount, "Low Token Balance!");
         _;
     }
 }
