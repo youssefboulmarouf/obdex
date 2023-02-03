@@ -129,12 +129,110 @@ contract OBDex {
         hasEnoughDaiToBuy(_amount, _price, _side, _type) ordersExists(_ticker, _side, _type) {
         
         if (_type == ORDER_TYPE.LIMIT) {
+            // Deduce And Lock Amount Of Tokens
+            lockTokens(_ticker, _amount, _price, _side, ORDER_TYPE.LIMIT);
 
+            // Create And Match Orders
+            manageOrders(_ticker, _amount, _price, _side, ORDER_TYPE.LIMIT);
         } else if (_type == ORDER_TYPE.MARKET) {
+
+            // Deduce amount to lock
+            // since we don't know how much the Market order 
+            // will consume from the existing Limit orders
+            uint _amountToLock = deduceAmountToLock(_ticker, _amount, _side);
+            
+            // Deduce Market Price
+            uint price = deduceMarketPrice(_ticker, _side);
+
+            // Trader Should Have Enough DAI Balance To Buy
+            if (_side == ORDER_SIDE.BUY) {            
+                require(balances[msg.sender][DAI].free >= _amountToLock, "Low DAI Balance!!!");
+            }
 
         } else {
             revert("Only Limit And Market Orders Are Allowed!");
         }
+    }
+
+    // --- Deduce And Lock Amount Of Tokens ---
+    function lockTokens(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE side, ORDER_TYPE orderType) 
+        internal {
+        
+        bytes32 tokenToLock = _ticker;
+        uint _amountToLock = _amount;
+
+        if (side == ORDER_SIDE.BUY) {
+            tokenToLock = DAI;
+            if (orderType == ORDER_TYPE.LIMIT) { 
+                _amountToLock = SafeMath.mul(_amount, _price);
+            }
+        }
+
+        lock(tokenToLock, _amountToLock);
+    }
+
+    // --- Lock Tokens ---
+    function lock(bytes32 _ticker, uint _amount) internal {
+        balances[msg.sender][_ticker].locked = balances[msg.sender][_ticker].locked.add(_amount);
+        balances[msg.sender][_ticker].free = balances[msg.sender][_ticker].free.sub(_amount);
+    }
+
+    // --- Create And Match Orders ---
+    function manageOrders(bytes32 ticker, uint amount, uint price, ORDER_SIDE side, ORDER_TYPE orderType) internal {
+        // Order storage newOrder = createOrder(ticker, side, orderType, amount, price);
+        // sortOrders(ticker, side);
+
+        // Order[] storage oppositeOrders = orderBook[ticker][uint(side == SIDE.BUY ? SIDE.SELL : SIDE.BUY)];
+        // if (oppositeOrders.length > 0) {
+        //     matchOrders(newOrder);
+        //     cleanOrders(ticker);
+        // }
+    }
+
+
+    // --- Deduce Amount Of Tokens To Lock ---
+    function deduceAmountToLock(bytes32 ticker, uint amount, ORDER_SIDE side) internal view returns(uint){
+        Order[] memory oppositeOrders = orderBook[ticker][uint(side == ORDER_SIDE.BUY ? ORDER_SIDE.SELL : ORDER_SIDE.BUY)];
+
+        uint index;
+        uint remaining = amount;
+
+        uint _amountToLock = 0;
+
+        while(index < oppositeOrders.length && remaining > 0) {
+            uint orderAmountFilled = amountFilled(oppositeOrders[index]);
+            uint available = SafeMath.sub(oppositeOrders[index].amount, orderAmountFilled);
+            uint matched = (remaining > available) ? available : remaining;
+
+            if (side == ORDER_SIDE.BUY) {
+                _amountToLock = SafeMath.add(_amountToLock, SafeMath.mul(matched, oppositeOrders[index].price));
+            } else if (side == ORDER_SIDE.SELL) {
+                _amountToLock = SafeMath.add(_amountToLock, matched);
+            }
+
+            remaining = remaining.sub(matched);
+
+            index = index.add(1);
+        }
+
+        return _amountToLock;
+    }
+
+    // --- Compute The Filled Amount Of An Order ---
+    function amountFilled(Order memory oppositeOrder) internal pure returns(uint) {
+        uint filledAmount;
+        
+        for (uint i; i < oppositeOrder.fills.length; i = i.add(1)) {
+            filledAmount = filledAmount.add(oppositeOrder.fills[i]);
+        }
+
+        return filledAmount;
+    }
+
+    // --- Deduce Market Price ---
+    function deduceMarketPrice(bytes32 ticker, ORDER_SIDE side) internal view returns(uint) {
+        Order[] storage orders = orderBook[ticker][uint(side == ORDER_SIDE.BUY ? ORDER_SIDE.SELL : ORDER_SIDE.BUY)];
+        return orders[0].price;
     }
 
     // --- Modifier: Admin Access Controle ---
