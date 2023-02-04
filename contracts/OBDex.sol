@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import '../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '../node_modules/@openzeppelin/contracts/utils/math/SafeMath.sol';
+import "../node_modules/@openzeppelin/contracts/utils/Strings.sol";
+import "../node_modules/hardhat/console.sol";
 
 contract OBDex {
     using SafeMath for uint;
@@ -10,6 +12,7 @@ contract OBDex {
     // --- Enums ---
     enum ORDER_SIDE { BUY, SELL }
     enum ORDER_TYPE { MARKET, LIMIT }
+    enum LOCKING    { LOCK, UNLOCK }
 
     // --- Structs ---
     struct Balance { 
@@ -61,6 +64,11 @@ contract OBDex {
 
     // --- Contract Constructor ---
     constructor() { admin = msg.sender; }
+
+    // --- Checks If Adres Is Admin ---
+    function isAdmin(address _address) external view returns(bool) {
+        return _address == admin;
+    }
 
     // --- Add Token ---
     function addToken(bytes32 _ticker, address _tokenAddress) 
@@ -124,13 +132,13 @@ contract OBDex {
     }
 
     // --- Create Limit Order ---
-    function createOrder(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE _side, ORDER_TYPE _type) 
+    function CreateNewOrder(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE _side, ORDER_TYPE _type) 
         external tokenExist(_ticker) notDai(_ticker) hasEnoughTokenToSell(_ticker, _amount, _side) 
         hasEnoughDaiToBuy(_amount, _price, _side, _type) ordersExists(_ticker, _side, _type) {
         
         if (_type == ORDER_TYPE.LIMIT) {
             // Deduce And Lock Amount Of Tokens
-            lockTokens(_ticker, _amount, _price, _side, ORDER_TYPE.LIMIT);
+            lockUnlockTokens(_ticker, _amount, _price, _side, ORDER_TYPE.LIMIT, LOCKING.LOCK);
 
             // Create And Match Orders
             manageOrders(_ticker, _amount, _price, _side, ORDER_TYPE.LIMIT);
@@ -144,12 +152,17 @@ contract OBDex {
             // Deduce Market Price
             uint marketPrice = deduceMarketPrice(_ticker, _side);
 
+            // The 'amount' should always be less than or equal to the '_amountToLock' variable before proceeding.
+            // This is because the '_amountToLock' variable represents the total amount of tokens being locked 
+            // and the 'amount' variable represents the amount of tokens being traded.
+            assert(_amount <= _amountToLock);
+            
             // Trader Should Have Enough DAI Balance To Buy
             if (_side == ORDER_SIDE.BUY) {            
                 require(balances[msg.sender][DAI].free >= _amountToLock, "Low DAI Balance!!!");
             }
 
-            lockTokens(_ticker, _amountToLock, marketPrice, _side, ORDER_TYPE.MARKET);
+            lockUnlockTokens(_ticker, _amountToLock, _price, _side, ORDER_TYPE.MARKET, LOCKING.LOCK);
             manageOrders(_ticker, _amount, marketPrice, _side, ORDER_TYPE.MARKET);
 
         } else {
@@ -157,27 +170,48 @@ contract OBDex {
         }
     }
 
-    // --- Deduce And Lock Amount Of Tokens ---
-    function lockTokens(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE side, ORDER_TYPE orderType) 
+    // TBT
+    // --- Cancle Order ---
+    function cancelOrder(bytes32 ticker, uint orderId, ORDER_SIDE side) 
+        external canCancel(ticker, orderId, side) {
+        
+        Order[] storage orders = orderBook[ticker][uint(side)];
+        Order storage order = orders[orderId];
+        lockUnlockTokens(ticker, order.amount, order.price, order.orderSide, order.orderType, LOCKING.UNLOCK);
+        delete orders[orderId];
+    }
+
+    // --- Lock And Unlock Tokens ---
+    function lockUnlockTokens(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE _side, ORDER_TYPE _orderType, LOCKING _locking) 
         internal {
         
         bytes32 tokenToLock = _ticker;
-        uint _amountToLock = _amount;
+        uint amountToLock = _amount;
 
-        if (side == ORDER_SIDE.BUY) {
+        if (_side == ORDER_SIDE.BUY) {
             tokenToLock = DAI;
-            if (orderType == ORDER_TYPE.LIMIT) { 
-                _amountToLock = SafeMath.mul(_amount, _price);
+            if (_orderType == ORDER_TYPE.LIMIT) { 
+                amountToLock = SafeMath.mul(_amount, _price);
             }
         }
 
-        lock(tokenToLock, _amountToLock);
+        if (_locking == LOCKING.LOCK) {
+            lock(tokenToLock, amountToLock);
+        } else if (_locking == LOCKING.UNLOCK) {
+            unlock(tokenToLock, amountToLock);
+        }
     }
 
     // --- Lock Tokens ---
     function lock(bytes32 _ticker, uint _amount) internal {
         balances[msg.sender][_ticker].locked = balances[msg.sender][_ticker].locked.add(_amount);
         balances[msg.sender][_ticker].free = balances[msg.sender][_ticker].free.sub(_amount);
+    }
+
+    // --- Unlock Tokens ---
+    function unlock(bytes32 _ticker, uint _amount) internal {
+        balances[msg.sender][_ticker].locked = balances[msg.sender][_ticker].locked.sub(_amount);
+        balances[msg.sender][_ticker].free = balances[msg.sender][_ticker].free.add(_amount);
     }
 
     // --- Create And Match Orders ---
@@ -352,7 +386,7 @@ contract OBDex {
         uint index;
         uint remaining = _amount;
 
-        uint _amountToLock = 0;
+        uint amountToLock = 0;
 
         while(index < oppositeOrders.length && remaining > 0) {
             uint orderAmountFilled = amountFilled(oppositeOrders[index]);
@@ -360,9 +394,9 @@ contract OBDex {
             uint matched = (remaining > available) ? available : remaining;
 
             if (_side == ORDER_SIDE.BUY) {
-                _amountToLock = SafeMath.add(_amountToLock, SafeMath.mul(matched, oppositeOrders[index].price));
+                amountToLock = SafeMath.add(amountToLock, SafeMath.mul(matched, oppositeOrders[index].price));
             } else if (_side == ORDER_SIDE.SELL) {
-                _amountToLock = SafeMath.add(_amountToLock, matched);
+                amountToLock = SafeMath.add(amountToLock, matched);
             }
 
             remaining = remaining.sub(matched);
@@ -370,7 +404,7 @@ contract OBDex {
             index = index.add(1);
         }
 
-        return _amountToLock;
+        return amountToLock;
     }
 
     // --- Compute The Filled Amount Of An Order ---
@@ -442,5 +476,15 @@ contract OBDex {
             require(orders.length > 0, "Empty Order Book! Please Create Limit Order!");
         }
         _;
-    }    
+    }
+
+    // --- Modifier: Checks If Order Can Be Canceles ---
+    modifier canCancel(bytes32 _ticker, uint _orderId, ORDER_SIDE _side) {
+        Order[] memory orders = orderBook[_ticker][uint(_side)];
+        Order memory order = orders[_orderId];
+        
+        require(order.traderAddress == msg.sender, "Only the trader can cancel the order");
+        require(order.orderType == ORDER_TYPE.LIMIT, "Only Limit Orders can be canceled");
+        _;
+    }
 }
