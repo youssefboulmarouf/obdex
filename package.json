@@ -2,7 +2,6 @@
   "name": "obdex",
   "version": "1.0.0",
   "description": "Order Book Decentralized Exchange",
-  "main": "truffle-config.js",
   "directories": {
     "test": "test"
   },
@@ -19,24 +18,22 @@
     "url": "https://github.com/youssefboulmarouf/obdex/issues"
   },
   "homepage": "https://github.com/youssefboulmarouf/obdex#readme",
-  "dependencies": {
+  "devDependencies": {
     "@openzeppelin/contracts": "^4.7.3",
-    "@openzeppelin/test-helpers": "^0.5.16",
-    "hardhat": "^2.12.5",
-    "hardhat-console": "^1.0.0",
+    "@ethersproject/abi": "^5.7.0",
+    "@ethersproject/providers": "^5.7.2",
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.5",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.7",
-    "@nomicfoundation/hardhat-chai-matchers": "^1.0.0",
-    "@nomiclabs/hardhat-ethers": "^2.0.0",
-    "@nomiclabs/hardhat-etherscan": "^3.0.0",
-    "@types/chai": "^4.2.0",
-    "@types/mocha": ">=9.1.0",
-    "@typechain/ethers-v5": "^10.1.0",
-    "@typechain/hardhat": "^6.1.2",
-    "hardhat-gas-reporter": "^1.0.8",
-    "solidity-coverage": "^0.8.1",
-    "ts-node": ">=8.0.0",
-    "typechain": "^8.1.0",
-    "typescript": ">=4.5.0",
-    "@nomicfoundation/hardhat-toolbox": "^2.0.0"
+    "@nomicfoundation/hardhat-toolbox": "^2.0.1",
+    "@nomiclabs/hardhat-ethers": "^2.2.2",
+    "@nomiclabs/hardhat-etherscan": "^3.1.5",
+    "@typechain/ethers-v5": "^10.2.0",
+    "@typechain/hardhat": "^6.1.5",
+    "chai": "^4.3.7",
+    "ethers": "^5.7.2",
+    "hardhat": "^2.12.6",
+    "hardhat-gas-reporter": "^1.0.9",
+    "solidity-coverage": "^0.8.2",
+    "typechain": "^8.1.1"
   }
 }
