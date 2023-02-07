@@ -72,7 +72,7 @@ contract OBDex {
 
     // --- Add Token ---
     function addToken(bytes32 _ticker, address _tokenAddress) 
-        external onlyAdmin() {
+        external onlyAdmin() tokenDoesNotExist(_ticker) {
 
         tokens[_ticker] = Token(_ticker, _tokenAddress); 
         tickerList.push(_ticker);
@@ -172,7 +172,11 @@ contract OBDex {
         
         Order[] storage orders = orderBook[ticker][uint(side)];
         Order storage order = orders[orderId];
-        lockUnlockTokens(ticker, order.amount, order.price, order.orderSide, order.orderType, LOCKING.UNLOCK);
+
+        uint filledAmount = amountFilled(order);
+        uint amoutToUnlock = order.amount.sub(filledAmount);
+
+        lockUnlockTokens(ticker, amoutToUnlock, order.price, order.orderSide, order.orderType, LOCKING.UNLOCK);
         delete orders[orderId]; 
     }
 
@@ -428,6 +432,12 @@ contract OBDex {
     // --- Modifier: Token Should Exist ---
     modifier tokenExist(bytes32 ticker) {
         require(tokens[ticker].tokenAddress != address(0), "Ticker Does Not Exist!");
+        _;
+    }
+
+    // --- Modifier: Token Should NOT Exist ---
+    modifier tokenDoesNotExist(bytes32 ticker) {
+        require(tokens[ticker].tokenAddress == address(0), "Ticker Already Exist!");
         _;
     }
 
