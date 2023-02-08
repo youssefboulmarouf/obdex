@@ -191,7 +191,76 @@ describe('OBDex', () => {
         });
     });
 
-    describe('Withdral', () => {});
+    describe('Withdraw', () => {
+        let obdex, dai, owner, trader, amount;
+
+        const withdrawFixture = async () => {
+            obdex = await deploy('OBDex');
+            dai = await deploy('Dai');
+
+            [owner, trader] = await hre.ethers.getSigners();
+
+            await obdex.contract.connect(owner).addToken(
+                hre.ethers.utils.formatBytes32String('DAI'),
+                dai.contract.address
+            );
+            
+            amount = hre.ethers.utils.parseUnits('1000', 'ether');
+            
+            await seedTraderWallet(obdex, trader, [dai], amount);
+            
+            await obdex.contract.connect(trader).deposit(
+                ethers.utils.formatBytes32String('DAI'), 
+                amount
+            );
+        }
+
+        it('Should withdraw if enough Balance', async() => {
+            await loadFixture(withdrawFixture);
+
+            let obdexBalances = await getTraderBalance(obdex, dai, trader);
+            let daiBalance = await dai.contract.balanceOf(trader.address);
+            expect(obdexBalances.free).to.be.equals(amount);
+            expect(daiBalance).to.be.equals(0);
+
+            const withdrawAmount = hre.ethers.utils.parseUnits('100', 'ether');
+            await obdex.contract.connect(trader).withdraw(
+                hre.ethers.utils.formatBytes32String('DAI'),
+                withdrawAmount
+            );
+
+            obdexBalances = await getTraderBalance(obdex, dai, trader);
+            daiBalance = await dai.contract.balanceOf(trader.address);
+            expect(obdexBalances.free).to.be.equals(
+                hre.ethers.utils.parseUnits('900', 'ether')
+            );
+            expect(daiBalance).to.be.equals(withdrawAmount);
+        });
+
+        it('Should NOT withdraw if NOT enough Balance', async() => {
+            await loadFixture(withdrawFixture);
+
+            const withdrawAmount = hre.ethers.utils.parseUnits('2000', 'ether');
+            await expect(
+                obdex.contract.connect(trader).withdraw(
+                    hre.ethers.utils.formatBytes32String('DAI'),
+                    withdrawAmount
+                )
+            ).to.be.revertedWith('Low Token Balance!');
+        });
+        
+        it('Should NOT withdraw if Token does NOT exist', async() => {
+            await loadFixture(withdrawFixture);
+
+            const withdrawAmount = hre.ethers.utils.parseUnits('2000', 'ether');
+            await expect(
+                obdex.contract.connect(trader).withdraw(
+                    hre.ethers.utils.formatBytes32String('ThisTokenDoesNotExist'),
+                    withdrawAmount
+                )
+            ).to.be.revertedWith('Ticker Does Not Exist!');
+        });
+    });
 
     describe('Balance', () => {});
 
