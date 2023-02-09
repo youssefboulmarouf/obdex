@@ -132,37 +132,30 @@ contract OBDex {
     }
 
     // --- Create Limit Order ---
-    function CreateNewOrder(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE _side, ORDER_TYPE _type) 
-        external newOrderModifier(_ticker, _amount, _price, _side, _type)  {
+    function createLimitOrder(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE _side) 
+        external newOrderModifier(_ticker, _amount, _side) hasEnoughDaiToBuy(_amount, _price, _side) {
         
-        if (_type == ORDER_TYPE.LIMIT) {
-            createLimitOrder(_ticker, _amount, _price, _side);
-        } else if (_type == ORDER_TYPE.MARKET) {
-            createMarketOrder(_ticker, _amount, _side);
-        } else {
-            revert("Only Limit And Market Orders Are Allowed!");
-        }
+        lockUnlockTokens(_ticker, _amount, _price, _side, ORDER_TYPE.LIMIT, LOCKING.LOCK);
+        manageOrders(_ticker, _amount, _price, _side, ORDER_TYPE.LIMIT);
     }
 
-    function createLimitOrder(bytes32 ticker, uint amount, uint price, ORDER_SIDE side) internal {
-        lockUnlockTokens(ticker, amount, price, side, ORDER_TYPE.LIMIT, LOCKING.LOCK);
-        manageOrders(ticker, amount, price, side, ORDER_TYPE.LIMIT);
-    }
-
-    function createMarketOrder(bytes32 ticker, uint amount, ORDER_SIDE side) internal {
-        uint _amountToLock = deduceAmountToLock(ticker, amount, side);
-        uint price = deduceMarketPrice(ticker, side);
+    // --- Create Market Order ---
+    function createMarketOrder(bytes32 _ticker, uint _amount, ORDER_SIDE _side) 
+        external newOrderModifier(_ticker, _amount, _side) ordersExists(_ticker, _side) {
+        
+        uint _amountToLock = deduceAmountToLock(_ticker, _amount, _side);
+        uint price = deduceMarketPrice(_ticker, _side);
 
         // The 'amount' should always be less than or equal to the '_amountToLock' variable before proceeding.
         // This is because the '_amountToLock' variable represents the total amount of tokens being locked 
         // and the 'amount' variable represents the amount of tokens being traded.
-        assert(amount <= _amountToLock);
-        if (side == ORDER_SIDE.BUY) {            
-            require(balances[msg.sender][DAI].free >= _amountToLock, "Low DAI Balance!!!");
+        assert(_amount <= _amountToLock);
+        if (_side == ORDER_SIDE.BUY) {            
+            require(balances[msg.sender][DAI].free >= _amountToLock, "Low DAI Balance!");
         }  
         
-        lockUnlockTokens(ticker, _amountToLock, price, side, ORDER_TYPE.MARKET, LOCKING.LOCK);
-        manageOrders(ticker, amount, price, side, ORDER_TYPE.MARKET);
+        lockUnlockTokens(_ticker, _amountToLock, price, _side, ORDER_TYPE.MARKET, LOCKING.LOCK);
+        manageOrders(_ticker, _amount, price, _side, ORDER_TYPE.MARKET);
     }
 
     // TBT
@@ -342,7 +335,7 @@ contract OBDex {
             balances[msg.sender][DAI].free = balances[msg.sender][DAI].free.add(finalPrice);
             balances[_oppositeOrder.traderAddress][_orderToMatch.ticker].free = balances[_oppositeOrder.traderAddress][_orderToMatch.ticker].free.add(_matched);
         } else if(_orderToMatch.orderSide == ORDER_SIDE.BUY) {
-            require(balances[msg.sender][DAI].locked >= finalPrice, "Low DAI Balance!!!");
+            require(balances[msg.sender][DAI].locked >= finalPrice, "Low DAI Balance!");
 
             balances[msg.sender][DAI].locked = balances[msg.sender][DAI].locked.sub(finalPrice);
             balances[_oppositeOrder.traderAddress][_orderToMatch.ticker].locked = balances[_oppositeOrder.traderAddress][_orderToMatch.ticker].locked.sub(_matched);
@@ -456,30 +449,28 @@ contract OBDex {
     // --- Modifier: Trader Should Have Enough Token Balance To Sell ---
     modifier hasEnoughTokenToSell(bytes32 ticker, uint amount, ORDER_SIDE side) {
         if (side == ORDER_SIDE.SELL) {
-            require(balances[msg.sender][ticker].free >= amount, "Low Token Balance!!!");
+            require(balances[msg.sender][ticker].free >= amount, "Low Token Balance!");
         }
         _;
     }
 
     // --- Modifier: Trader Should Have Enough DAI Balance To Buy ---
-    modifier hasEnoughDaiToBuy(uint _amount, uint _price, ORDER_SIDE _side, ORDER_TYPE _type) {
+    modifier hasEnoughDaiToBuy(uint _amount, uint _price, ORDER_SIDE _side) {
         // This should ONLY be checked on LIMIT orders 
         // since we know the exact amount and price
         // which is not the case in MARKET orders
-        if (_side == ORDER_SIDE.BUY &&_type == ORDER_TYPE.LIMIT) {
-            require(balances[msg.sender][DAI].free >= SafeMath.mul(_amount, _price), "Low DAI Balance!!!");
+        if (_side == ORDER_SIDE.BUY) {
+            require(balances[msg.sender][DAI].free >= SafeMath.mul(_amount, _price), "Low DAI Balance!");
         }
         _;
     }
 
     // --- Modifier: Orders Should Exist To Open Market Orders ---
-    modifier ordersExists(bytes32 _ticker, ORDER_SIDE _side, ORDER_TYPE _type) {
+    modifier ordersExists(bytes32 _ticker, ORDER_SIDE _side) {
         // This should ONLY be checked on MARKET orders 
-        // since we need orders toexist for the matching to happen
-        if (_type == ORDER_TYPE.MARKET) {
-            Order[] memory orders = orderBook[_ticker][uint(_side == ORDER_SIDE.BUY ? ORDER_SIDE.SELL : ORDER_SIDE.BUY)];
-            require(orders.length > 0, "Empty Order Book! Please Create Limit Order!");
-        }
+        // since we need opposite orders to exist for the matching to happen
+        Order[] memory orders = orderBook[_ticker][uint(_side == ORDER_SIDE.BUY ? ORDER_SIDE.SELL : ORDER_SIDE.BUY)];
+        require(orders.length > 0, "Empty Order Book! Please Create Limit Order!");
         _;
     }
 
@@ -493,7 +484,7 @@ contract OBDex {
         _;
     }
 
-    modifier newOrderModifier(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE _side, ORDER_TYPE _type) {
+    modifier newOrderModifier(bytes32 _ticker, uint _amount, ORDER_SIDE _side) {
         // THIS ORDER MODIFER IS TO AVOID THE `STACK TOO DEEP ERROR COMPILATION`
         // IT HAPPENS WHEN THERE IS +5 MODIFIERS OR +16 FUNCTION PARAMETERS
         
@@ -505,18 +496,7 @@ contract OBDex {
 
         // --- Modifier: Trader Should Have Enough Token Balance To Sell ---        
         if (_side == ORDER_SIDE.SELL) {
-            require(balances[msg.sender][_ticker].free >= _amount, "Low Token Balance!!!");
-        }
-
-        // --- Modifier: Trader Should Have Enough DAI Balance To Buy ---
-        if (_side == ORDER_SIDE.BUY &&_type == ORDER_TYPE.LIMIT) {
-            require(balances[msg.sender][DAI].free >= SafeMath.mul(_amount, _price), "Low DAI Balance!!!");
-        }
-
-        // --- Modifier: Orders Should Exist To Open Market Orders ---
-        if (_type == ORDER_TYPE.MARKET) {
-            Order[] memory orders = orderBook[_ticker][uint(_side == ORDER_SIDE.BUY ? ORDER_SIDE.SELL : ORDER_SIDE.BUY)];
-            require(orders.length > 0, "Empty Order Book! Please Create Limit Order!");
+            require(balances[msg.sender][_ticker].free >= _amount, "Low Token Balance!");
         }
         _;
     }
