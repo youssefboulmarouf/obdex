@@ -695,6 +695,26 @@ describe('OBDex', () => {
         //it('', async () => {});
     });
 
-    describe('Market', () => {});
+    describe('Market', () => {
+        it('Should NOT create BUY market order if token does NOT Exist', async () => {
+            
+        });
+
+        it('Should NOT create BUY market order if token is DAI', async () => {});
+
+        it('Should NOT create BUY market order if NOT enough tokens', async () => {});
+
+        it('Should NOT create BUY market order if NOT enough DAI balance', async () => {});
+
+        it('Should NOT create BUY market order if EMPTY Order Book', async () => {});
+
+        it('Should match BUY Market Order against existing Orders (BUY Market Order Amount > SELL Orders Amount)', async () => {});
+
+        it('Should match BUY Market Order against existant Orders (BUY Market Order Amount < SELL Orders Amount)', async () => {});
+
+        it('Should match SELL Market Order against existing Orders (SELL Market Order Amount > BUY Orders Amount) ', async () => {});
+
+        it('Should match SELL Market Order against existing Orders (SELL Market Order Amount < BUY Orders Amount)', async () => {});
+    });
 
 });
