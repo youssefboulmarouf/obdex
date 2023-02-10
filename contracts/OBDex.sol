@@ -474,13 +474,26 @@ contract OBDex {
         _;
     }
 
-    // --- Modifier: Checks If Order Can Be Canceles ---
+    // --- Modifier: Checks If Order Can Be Canceled ---
     modifier canCancel(bytes32 _ticker, uint _orderId, ORDER_SIDE _side) {
         Order[] memory orders = orderBook[_ticker][uint(_side)];
-        Order memory order = orders[_orderId];
+
+        uint orderIndex;
+        bool orderFound = false;
         
-        require(order.traderAddress == msg.sender, "Only the trader can cancel the order");
+        // Look for order index with id = _orderId
+        for (uint i = 0; i <= orders.length; i = i.add(1)) {
+            if (orders[i].id == _orderId) {
+                orderIndex = i;
+                orderFound = true;
+            }
+        }
+
+        require(orderFound == true, "Order Not Found!");
+
+        Order memory order = orders[orderIndex];
         require(order.orderType == ORDER_TYPE.LIMIT, "Only Limit Orders can be canceled");
+        require(order.traderAddress == msg.sender, "Only the order trader can cancel the order");        
         _;
     }
 
