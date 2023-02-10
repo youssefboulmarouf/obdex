@@ -476,8 +476,8 @@ describe('OBDex', () => {
             expect(buyOrders[2].price).to.be.equals(3);
             expect(buyOrders[2].traderAddress).to.be.equals(trader1.address);
 
-            console.log('buyOrders2: ', buyOrders[2]);
-            console.log('trader1.address: ', trader1.address);
+            //console.log('buyOrders2: ', buyOrders[2]);
+            //console.log('trader1.address: ', trader1.address);
 
 
             // Trader1 Cancel his order with price = 3
@@ -769,12 +769,12 @@ describe('OBDex', () => {
             expect(obdexBalances.free).to.be.equals(0);
             expect(obdexBalances.locked).to.be.equals(0);
 
+            await obdex.contract.connect(trader4)
+                .createLimitOrder(BAT, toEthUnit('1'), 1, ORDER_SIDE.SELL);
+            
             await expect(
-                obdex.contract.connect(trader3).createMarketOrder(
-                    BAT,
-                    amount,
-                    ORDER_SIDE.BUY
-                )
+                obdex.contract.connect(trader3)
+                    .createMarketOrder(BAT, toEthUnit('1'), ORDER_SIDE.BUY)
             ).to.be.revertedWith('Low DAI Balance!');
         });
 
