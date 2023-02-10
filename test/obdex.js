@@ -39,35 +39,6 @@ describe('OBDex', () => {
         return obdexBalances;
     }
 
-    // const obdexFixture = async () => {
-    //     // Deploy the contracts
-    //     const [dai, bat, rep, zrx] = await Promise.all(
-    //         ['Dai', 'Bat', 'Rep', 'Zrx'].map(contractName => deploy(contractName))
-    //     );
-    //     const obdex = await deploy('OBDex');
-
-    //     // Add Tokens To OBDex
-    //     await Promise.all([
-    //     [['DAI', dai], ['ZRX', zrx], ['REP', rep], ['BAT', bat]].map(([ticker, token]) => 
-    //         obdex.contract.addToken(
-    //             hre.ethers.utils.formatBytes32String(ticker), // Converting Ticker from String to Bytes32
-    //             token.contract.address
-    //         )
-    //     )]);
-
-    //     const tokens = await obdex.contract.getTokens();
-    //     //console.log('tokens:', tokens);
-
-    //     // Seed Traders Accounts
-    //     const amount = hre.ethers.utils.parseUnits('1000', 'ether');
-    //     // --- hardhat accounts
-    //     const [owner, trader1, trader2, trader3, trader4, others] = await hre.ethers.getSigners();
-    //     await Promise.all([
-    //         [trader1, trader2, trader3, trader4].map(trader => 
-    //             seedTraderWallet(obdex, trader, [dai, bat, rep, zrx], amount)
-    //         )
-    //     ]);
-    // }z
 
     describe('Token', () => {
         let obdex, dai, owner, trader;
@@ -327,7 +298,7 @@ describe('OBDex', () => {
             await obdex.contract.connect(trader4).deposit(ZRX, amount);
         }
 
-        it('Should NOT create BUY Limit Orders if token does NOT Exist', async () => {
+        it('Should NOT create Limit Order if Token does NOT Exist', async () => {
             await loadFixture(limitFixture);
             await expect(
                 obdex.contract.connect(trader1).createLimitOrder(
@@ -335,6 +306,15 @@ describe('OBDex', () => {
                     amount,
                     1,
                     ORDER_SIDE.SELL
+                )
+            ).to.be.revertedWith('Ticker Does Not Exist!');
+
+            await expect(
+                obdex.contract.connect(trader1).createLimitOrder(
+                    hre.ethers.utils.formatBytes32String('ThisTokenDoesNotExist'),
+                    amount,
+                    1,
+                    ORDER_SIDE.BUY
                 )
             ).to.be.revertedWith('Ticker Does Not Exist!');
         });
@@ -691,29 +671,145 @@ describe('OBDex', () => {
             expect(sellOrders[0].fills.length).to.be.equals(1);
             expect(sellOrders[0].fills[0]).to.be.equals(hre.ethers.utils.parseUnits('10', 'ether'));
         });
-        
-        //it('', async () => {});
     });
 
     describe('Market', () => {
-        it('Should NOT create BUY market order if token does NOT Exist', async () => {
+        let obdex, dai, rep, bat, zrx, owner, trader1, trader2, trader3, trader4, amount;
+
+        const marketFixture = async () => {
+            obdex = await deploy('OBDex');
+            dai = await deploy('Dai');
+            rep = await deploy('Rep');
+            bat = await deploy('Bat');
+            zrx = await deploy('Zrx');
+
+            [owner, trader1, trader2, trader3, trader4] = await hre.ethers.getSigners();
+
+            await obdex.contract.connect(owner).addToken(DAI, dai.contract.address);
+            await obdex.contract.connect(owner).addToken(REP, rep.contract.address);
+            await obdex.contract.connect(owner).addToken(BAT, bat.contract.address);
+            await obdex.contract.connect(owner).addToken(ZRX, zrx.contract.address);
             
+            amount = hre.ethers.utils.parseUnits('1000', 'ether');
+            
+            await seedTraderWallet(obdex, trader1, [dai], amount);
+            await obdex.contract.connect(trader1).deposit(DAI, amount);
+
+            await seedTraderWallet(obdex, trader2, [rep, zrx], amount);
+            await obdex.contract.connect(trader2).deposit(REP, amount);
+            await obdex.contract.connect(trader2).deposit(ZRX, amount);
+
+            await seedTraderWallet(obdex, trader3, [bat, zrx], amount);
+            await obdex.contract.connect(trader3).deposit(BAT, amount);
+            await obdex.contract.connect(trader3).deposit(ZRX, amount);
+
+            await seedTraderWallet(obdex, trader4, [dai, rep, bat, zrx], amount);
+            await obdex.contract.connect(trader4).deposit(DAI, amount);
+            await obdex.contract.connect(trader4).deposit(BAT, amount);
+            await obdex.contract.connect(trader4).deposit(REP, amount);
+            await obdex.contract.connect(trader4).deposit(ZRX, amount);
+        }
+
+        it('Should NOT create Market Order if Token does NOT Exist', async () => {
+            await loadFixture(marketFixture);
+            await expect(
+                obdex.contract.connect(trader1).createMarketOrder(
+                    hre.ethers.utils.formatBytes32String('ThisTokenDoesNotExist'),
+                    amount,
+                    ORDER_SIDE.SELL
+                )
+            ).to.be.revertedWith('Ticker Does Not Exist!');
+
+            await expect(
+                obdex.contract.connect(trader1).createMarketOrder(
+                    hre.ethers.utils.formatBytes32String('ThisTokenDoesNotExist'),
+                    amount,
+                    ORDER_SIDE.BUY
+                )
+            ).to.be.revertedWith('Ticker Does Not Exist!');
         });
 
-        it('Should NOT create BUY market order if token is DAI', async () => {});
+        it('Should NOT create Market Order if Token is DAI', async () => {
+            await loadFixture(marketFixture);
+            
+            await expect(
+                obdex.contract.connect(trader1).createMarketOrder(
+                    DAI,
+                    amount,
+                    ORDER_SIDE.BUY
+                )
+            ).to.be.revertedWith('Cannot Trade DAI Token!');
 
-        it('Should NOT create BUY market order if NOT enough tokens', async () => {});
+            await expect(
+                obdex.contract.connect(trader1).createMarketOrder(
+                    DAI,
+                    amount,
+                    ORDER_SIDE.SELL
+                )
+            ).to.be.revertedWith('Cannot Trade DAI Token!');
+        });
 
-        it('Should NOT create BUY market order if NOT enough DAI balance', async () => {});
+        it('Should NOT create SELL Market Order if LOW Token Balance', async () => {
+            await loadFixture(marketFixture);
 
-        it('Should NOT create BUY market order if EMPTY Order Book', async () => {});
+            const obdexBalances = await getTraderBalance(obdex, bat, trader1)
+            expect(obdexBalances.free).to.be.equals(0);
+            expect(obdexBalances.locked).to.be.equals(0);
 
+            await expect(
+                obdex.contract.connect(trader1).createMarketOrder(
+                    BAT,
+                    amount,
+                    ORDER_SIDE.SELL
+                )
+            ).to.be.revertedWith('Low Token Balance!');
+        });
+
+        it('Should NOT create BUY Market Order if LOW DAI Balance', async () => {
+            await loadFixture(marketFixture);
+
+            const obdexBalances = await getTraderBalance(obdex, dai, trader3)
+            expect(obdexBalances.free).to.be.equals(0);
+            expect(obdexBalances.locked).to.be.equals(0);
+
+            await expect(
+                obdex.contract.connect(trader3).createMarketOrder(
+                    BAT,
+                    amount,
+                    ORDER_SIDE.BUY
+                )
+            ).to.be.revertedWith('Low DAI Balance!');
+        });
+
+        it('Should NOT create BUY market order if EMPTY Order Book', async () => {
+            await loadFixture(marketFixture);
+
+            const obdexBalances = await getTraderBalance(obdex, dai, trader1)
+            expect(obdexBalances.free).to.be.equals(hre.ethers.utils.parseUnits('1000', 'ether'));
+            expect(obdexBalances.locked).to.be.equals(0);
+
+            const sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            expect(sellOrders.length).to.be.equals(0);
+
+            await expect(
+                obdex.contract.connect(trader1).createMarketOrder(
+                    BAT,
+                    amount,
+                    ORDER_SIDE.BUY
+                )
+            ).to.be.revertedWith('Empty Order Book! Please Create Limit Order!');
+        });
+
+        // TBD
         it('Should match BUY Market Order against existing Orders (BUY Market Order Amount > SELL Orders Amount)', async () => {});
 
+        // TBD
         it('Should match BUY Market Order against existant Orders (BUY Market Order Amount < SELL Orders Amount)', async () => {});
 
+        // TBD
         it('Should match SELL Market Order against existing Orders (SELL Market Order Amount > BUY Orders Amount) ', async () => {});
 
+        // TBD
         it('Should match SELL Market Order against existing Orders (SELL Market Order Amount < BUY Orders Amount)', async () => {});
     });
 
