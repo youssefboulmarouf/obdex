@@ -484,6 +484,71 @@ describe('OBDex', () => {
 
         });
 
+        // TBF
+        it('Should Cancel Limit Order', async () => {
+            await loadFixture(limitFixture);
+
+            const amountToTrade = hre.ethers.utils.parseUnits('5', 'ether');
+            await obdex.contract.connect(trader1).createLimitOrder(BAT, amountToTrade, 3, ORDER_SIDE.BUY);
+            await obdex.contract.connect(trader4).createLimitOrder(BAT, amountToTrade, 1, ORDER_SIDE.BUY);
+            await obdex.contract.connect(trader4).createLimitOrder(BAT, amountToTrade, 2, ORDER_SIDE.BUY);
+
+            let buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(3);
+
+            expect(buyOrders[2].price).to.be.equals(3);
+            expect(buyOrders[2].traderAddress).to.be.equals(trader1.address);
+
+            console.log('buyOrders2: ', buyOrders[2]);
+            console.log('trader1.address: ', trader1.address);
+
+
+            // Trader1 Cancel his order with price = 3
+            //await obdex.contract.connect(trader1).cancelOrder(BAT, buyOrders[2].id, ORDER_SIDE.BUY);
+            
+            //buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            // expect(buyOrders.length).to.be.equals(2);
+
+            // expect(buyOrders[0].price).to.be.equals(1);
+            // expect(buyOrders[0].traderAddress).to.be.equals(trader4.address);
+
+            // expect(buyOrders[1].price).to.be.equals(2);
+            // expect(buyOrders[1].traderAddress).to.be.equals(trader4.address);
+
+            // await obdex.contract.connect(trader2).createLimitOrder(ZRX, amountToTrade, 3, ORDER_SIDE.SELL);
+            // await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 1, ORDER_SIDE.SELL);
+            // await obdex.contract.connect(trader3).createLimitOrder(ZRX, amountToTrade, 2, ORDER_SIDE.SELL);
+            // await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 7, ORDER_SIDE.SELL);
+
+            // let sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
+            // expect(sellOrders.length).to.be.equals(4);
+
+            // expect(sellOrders[1].price).to.be.equals(2);
+            // expect(sellOrders[1].traderAddress).to.be.equals(trader3.address);
+
+            // // Trader1 Cancel his order with price = 3
+            // await obdex.contract.connect(trader3).cancelOrder(ZRX, buyOrders[1].id, ORDER_SIDE.BUY);
+
+            // sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
+            // expect(sellOrders.length).to.be.equals(3);
+            
+            // expect(sellOrders[0].price).to.be.equals(1);
+            // expect(sellOrders[0].traderAddress).to.be.equals(trader4.address);
+            
+            // expect(sellOrders[1].price).to.be.equals(3);
+            // expect(sellOrders[1].traderAddress).to.be.equals(trader2.address);
+
+            // expect(sellOrders[2].price).to.be.equals(7);
+            // expect(sellOrders[2].traderAddress).to.be.equals(trader4.address);
+
+        });
+
+        // TBD
+        it('Should NOT Cancel NON Existing Limit Order', async () => {});
+
+        // TBD
+        it('Should NOT Cancel Limit Order if NOT order Trader (Order Owner)', async () => {});
+
         it('Should create Limit Order and Lock the correct amount', async () => {
             await loadFixture(limitFixture);
 
@@ -630,6 +695,6 @@ describe('OBDex', () => {
         //it('', async () => {});
     });
 
-    describe('Market Order', () => {});
+    describe('Market', () => {});
 
 });
