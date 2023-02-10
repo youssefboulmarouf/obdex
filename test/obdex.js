@@ -520,6 +520,113 @@ describe('OBDex', () => {
 
         });
 
+        it('Should create Limit Order, Match and Clear them', async () => {
+            await loadFixture(limitFixture);
+
+            // Check Trader1 BAT Balance 
+            let trader1Balance = await getTraderBalance(obdex, bat, trader1);
+            expect(trader1Balance.free).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader1Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            
+            // Trader1 BUY 100 BAT for price of 3 DAI each => 300 DAI LOCKED
+            await obdex.contract.connect(trader1)
+                .createLimitOrder(BAT, hre.ethers.utils.parseUnits('100', 'ether'), 3, ORDER_SIDE.BUY);
+            
+            // Check Trader1 Locked DAI Balance 
+            trader1Balance = await getTraderBalance(obdex, dai, trader1);
+            expect(trader1Balance.free).to.be.equals(hre.ethers.utils.parseUnits('700', 'ether'));
+            expect(trader1Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('300', 'ether'));
+
+            // Trader3 SELL 150 BAT for price of 3 DAI each => 150 DAI LOCKED
+            await obdex.contract.connect(trader3)
+                .createLimitOrder(BAT, hre.ethers.utils.parseUnits('150', 'ether'), 3, ORDER_SIDE.SELL);
+
+            // Check Trader3 New DAI Balance 
+            let trader3Balance = await getTraderBalance(obdex, dai, trader3);
+            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('300', 'ether'));
+            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+
+            // Check Trader3 New BAT Balance 
+            trader3Balance = await getTraderBalance(obdex, bat, trader3);
+            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('850', 'ether'));
+            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('50', 'ether'));
+
+            // Check Trader1 New DAI Balance
+            trader1Balance = await getTraderBalance(obdex, dai, trader1);
+            expect(trader1Balance.free).to.be.equals(hre.ethers.utils.parseUnits('700', 'ether'));
+            expect(trader1Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            
+            // Check Trader1 New BAT Balance
+            trader1Balance = await getTraderBalance(obdex, bat, trader1);
+            expect(trader1Balance.free).to.be.equals(hre.ethers.utils.parseUnits('100', 'ether'));
+            expect(trader1Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            
+            // Check BAT BUY Orders
+            let buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(0);
+
+            // Check BAT SELL Orders
+            let sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(1);
+            expect(sellOrders[0].amount).to.be.equals(hre.ethers.utils.parseUnits('150', 'ether'));
+            expect(sellOrders[0].fills.length).to.be.equals(1);
+            expect(sellOrders[0].fills[0]).to.be.equals(hre.ethers.utils.parseUnits('100', 'ether'));
+
+            // Check Trader3 REP Balance 
+            trader3Balance = await getTraderBalance(obdex, rep, trader3);
+            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            
+            // Trader3 BUY 10 REP for price of 10 DAI each => 100 DAI LOCKED
+            await obdex.contract.connect(trader3)
+                .createLimitOrder(REP, hre.ethers.utils.parseUnits('10', 'ether'), 10, ORDER_SIDE.BUY);
+            
+            // Check Trader3 Locked DAI Balance 
+            trader3Balance = await getTraderBalance(obdex, dai, trader3);
+            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('200', 'ether'));
+            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('100', 'ether'));
+            
+            // Check Trader2 DAI Balance 
+            let trader2Balance = await getTraderBalance(obdex, dai, trader2);
+            expect(trader2Balance.free).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader2Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            
+            // Trader2 SELL 100 REP for price of 10 DAI each => 100 REP LOCKED
+            await obdex.contract.connect(trader2)
+                .createLimitOrder(REP, hre.ethers.utils.parseUnits('100', 'ether'), 10, ORDER_SIDE.SELL);
+            
+            // Check Trader3 New DAI Balance 
+            trader3Balance = await getTraderBalance(obdex, dai, trader3);
+            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('200', 'ether'));
+            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+
+            // Check Trader3 New REP Balance 
+            trader3Balance = await getTraderBalance(obdex, rep, trader3);
+            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('10', 'ether'));
+            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+
+            // Check Trader2 New DAI Balance
+            trader2Balance = await getTraderBalance(obdex, dai, trader2);
+            expect(trader2Balance.free).to.be.equals(hre.ethers.utils.parseUnits('100', 'ether'));
+            expect(trader2Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            
+            // Check Trader2 New REP Balance
+            trader2Balance = await getTraderBalance(obdex, rep, trader2);
+            expect(trader2Balance.free).to.be.equals(hre.ethers.utils.parseUnits('900', 'ether'));
+            expect(trader2Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('90', 'ether'));
+
+            // Check REP BUY Orders
+            buyOrders = await obdex.contract.getOrders(REP, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(0);
+
+            // Check REP SELL Orders
+            sellOrders = await obdex.contract.getOrders(REP, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(1);
+            expect(sellOrders[0].amount).to.be.equals(hre.ethers.utils.parseUnits('100', 'ether'));
+            expect(sellOrders[0].fills.length).to.be.equals(1);
+            expect(sellOrders[0].fills[0]).to.be.equals(hre.ethers.utils.parseUnits('10', 'ether'));
+        });
+        
         //it('', async () => {});
     });
 
