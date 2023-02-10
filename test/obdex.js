@@ -39,6 +39,9 @@ describe('OBDex', () => {
         return obdexBalances;
     }
 
+    const toEthUnit = (amount) => {
+        return hre.ethers.utils.parseUnits(amount, 'ether')
+    }
 
     describe('Token', () => {
         let obdex, dai, owner, trader;
@@ -49,7 +52,7 @@ describe('OBDex', () => {
             [owner, trader] = await hre.ethers.getSigners();
         }
 
-        it('Should NOT Add Tokens If NOT Admin', async () => {            
+        it('Should NOT Add Tokens if NOT Admin', async () => {            
             await loadFixture(tokenFixture);
 
             await expect(
@@ -106,7 +109,7 @@ describe('OBDex', () => {
         it('Should NOT Deposit If Ticker Does NOT Exist', async () => {
             await loadFixture(depositFixture);
 
-            const amount = hre.ethers.utils.parseUnits('10', 'ether');
+            const amount = toEthUnit('10');
             const tokenName = 'ThisTokenDoesNotExist';
             
             await expect(
@@ -120,7 +123,7 @@ describe('OBDex', () => {
         it('Should deposit if Ticker exists', async () => {
             await loadFixture(depositFixture);
 
-            const amount = hre.ethers.utils.parseUnits('1000', 'ether');
+            const amount = toEthUnit('1000');
             
             // Mint token for trader
             await dai.contract.faucet(trader.address, amount);
@@ -154,7 +157,7 @@ describe('OBDex', () => {
 
             await obdex.contract.connect(owner).addToken(DAI, dai.contract.address);
             
-            amount = hre.ethers.utils.parseUnits('1000', 'ether');
+            amount = toEthUnit('1000');
             
             await seedTraderWallet(obdex, trader, [dai], amount);
             
@@ -169,21 +172,19 @@ describe('OBDex', () => {
             expect(obdexBalances.free).to.be.equals(amount);
             expect(daiBalance).to.be.equals(0);
 
-            const withdrawAmount = hre.ethers.utils.parseUnits('100', 'ether');
+            const withdrawAmount = toEthUnit('100');
             await obdex.contract.connect(trader).withdraw(DAI, withdrawAmount);
 
             obdexBalances = await getTraderBalance(obdex, dai, trader);
             daiBalance = await dai.contract.balanceOf(trader.address);
-            expect(obdexBalances.free).to.be.equals(
-                hre.ethers.utils.parseUnits('900', 'ether')
-            );
+            expect(obdexBalances.free).to.be.equals(toEthUnit('900'));
             expect(daiBalance).to.be.equals(withdrawAmount);
         });
 
         it('Should NOT withdraw if NOT enough Balance', async() => {
             await loadFixture(withdrawFixture);
 
-            const withdrawAmount = hre.ethers.utils.parseUnits('2000', 'ether');
+            const withdrawAmount = toEthUnit('2000');
             await expect(
                 obdex.contract.connect(trader).withdraw(DAI, withdrawAmount)
             ).to.be.revertedWith('Low Token Balance!');
@@ -192,7 +193,7 @@ describe('OBDex', () => {
         it('Should NOT withdraw if Token does NOT exist', async() => {
             await loadFixture(withdrawFixture);
 
-            const withdrawAmount = hre.ethers.utils.parseUnits('2000', 'ether');
+            const withdrawAmount = toEthUnit('2000');
             await expect(
                 obdex.contract.connect(trader).withdraw(
                     hre.ethers.utils.formatBytes32String('ThisTokenDoesNotExist'),
@@ -215,7 +216,7 @@ describe('OBDex', () => {
             await obdex.contract.connect(owner).addToken(DAI, dai.contract.address);
             await obdex.contract.connect(owner).addToken(REP, rep.contract.address);
             
-            amount = hre.ethers.utils.parseUnits('1000', 'ether');
+            amount = toEthUnit('1000');
             
             await seedTraderWallet(obdex, trader1, [dai, rep], amount);
             await obdex.contract.connect(trader1).deposit(DAI, amount);
@@ -278,7 +279,7 @@ describe('OBDex', () => {
             await obdex.contract.connect(owner).addToken(BAT, bat.contract.address);
             await obdex.contract.connect(owner).addToken(ZRX, zrx.contract.address);
             
-            amount = hre.ethers.utils.parseUnits('1000', 'ether');
+            amount = toEthUnit('1000');
             
             await seedTraderWallet(obdex, trader1, [dai], amount);
             await obdex.contract.connect(trader1).deposit(DAI, amount);
@@ -385,17 +386,13 @@ describe('OBDex', () => {
             expect(sellOrders.length).to.be.equals(0);
 
             // Buying Amount (10 BAT) with Price (1 DAI) = 10 DAI => 10 DAI to be LOCKED
-            await obdex.contract.connect(trader1).createLimitOrder(
-                BAT,
-                hre.ethers.utils.parseUnits('5', 'ether'),
-                1,
-                ORDER_SIDE.BUY
-            );
+            await obdex.contract.connect(trader1)
+                .createLimitOrder(BAT, toEthUnit('5'), 1, ORDER_SIDE.BUY);
 
             buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
             expect(buyOrders.length).to.be.equals(1);
             expect(buyOrders[0].price).to.be.equals(1);
-            expect(buyOrders[0].amount).to.be.equals(hre.ethers.utils.parseUnits('5', 'ether'));
+            expect(buyOrders[0].amount).to.be.equals(toEthUnit('5'));
             expect(buyOrders[0].ticker).to.be.equals(BAT);
             expect(buyOrders[0].traderAddress).to.be.equals(trader1.address);
             expect(buyOrders[0].orderType).to.be.equals(ORDER_TYPE.LIMIT);
@@ -405,7 +402,7 @@ describe('OBDex', () => {
             // Selling Amount (10 REP) with Price (1 DAI) = 10 DAI => 10 REP to be LOCKED
             await obdex.contract.connect(trader2).createLimitOrder(
                 REP,
-                hre.ethers.utils.parseUnits('10', 'ether'),
+                toEthUnit('10'),
                 1,
                 ORDER_SIDE.SELL
             );
@@ -413,7 +410,7 @@ describe('OBDex', () => {
             sellOrders = await obdex.contract.getOrders(REP, ORDER_SIDE.SELL);
             expect(sellOrders.length).to.be.equals(1);
             expect(sellOrders[0].price).to.be.equals(1);
-            expect(sellOrders[0].amount).to.be.equals(hre.ethers.utils.parseUnits('10', 'ether'));
+            expect(sellOrders[0].amount).to.be.equals(toEthUnit('10'));
             expect(sellOrders[0].ticker).to.be.equals(REP);
             expect(sellOrders[0].traderAddress).to.be.equals(trader2.address);
             expect(sellOrders[0].orderType).to.be.equals(ORDER_TYPE.LIMIT);
@@ -424,7 +421,7 @@ describe('OBDex', () => {
         it('Should create Limit Order and Sort them', async () => {
             await loadFixture(limitFixture);
 
-            const amountToTrade = hre.ethers.utils.parseUnits('5', 'ether');
+            const amountToTrade = toEthUnit('5');
             await obdex.contract.connect(trader1).createLimitOrder(BAT, amountToTrade, 3, ORDER_SIDE.BUY);
             await obdex.contract.connect(trader4).createLimitOrder(BAT, amountToTrade, 1, ORDER_SIDE.BUY);
             await obdex.contract.connect(trader4).createLimitOrder(BAT, amountToTrade, 2, ORDER_SIDE.BUY);
@@ -468,7 +465,7 @@ describe('OBDex', () => {
         it('Should Cancel Limit Order', async () => {
             await loadFixture(limitFixture);
 
-            const amountToTrade = hre.ethers.utils.parseUnits('5', 'ether');
+            const amountToTrade = toEthUnit('5');
             await obdex.contract.connect(trader1).createLimitOrder(BAT, amountToTrade, 3, ORDER_SIDE.BUY);
             await obdex.contract.connect(trader4).createLimitOrder(BAT, amountToTrade, 1, ORDER_SIDE.BUY);
             await obdex.contract.connect(trader4).createLimitOrder(BAT, amountToTrade, 2, ORDER_SIDE.BUY);
@@ -532,7 +529,7 @@ describe('OBDex', () => {
         it('Should create Limit Order and Lock the correct amount', async () => {
             await loadFixture(limitFixture);
 
-            const amountToTrade = hre.ethers.utils.parseUnits('5', 'ether');
+            const amountToTrade = toEthUnit('5');
             // Trader1 BUY 5 BAT for price of 3 DAI each => 15 DAI LOCKED
             await obdex.contract.connect(trader1).createLimitOrder(BAT, amountToTrade, 3, ORDER_SIDE.BUY);
             // Trader4 BUY 5 BAT for price of 1 DAI each => 5 DAI LOCKED
@@ -543,8 +540,8 @@ describe('OBDex', () => {
             let trader1Balance = await getTraderBalance(obdex, dai, trader1);
             let trader4Balance = await getTraderBalance(obdex, dai, trader4);
             
-            expect(trader1Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('15', 'ether'));
-            expect(trader4Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('15', 'ether'));
+            expect(trader1Balance.locked).to.be.equals(toEthUnit('15'));
+            expect(trader4Balance.locked).to.be.equals(toEthUnit('15'));
 
             // SELL 5 ZRX for price of 3 DAI each => 5 ZRX LOCKED
             await obdex.contract.connect(trader2).createLimitOrder(ZRX, amountToTrade, 3, ORDER_SIDE.SELL);
@@ -559,9 +556,9 @@ describe('OBDex', () => {
             let trader2Balance = await getTraderBalance(obdex, zrx, trader2);
             let trader3Balance = await getTraderBalance(obdex, zrx, trader3);
 
-            expect(trader4Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('10', 'ether'));
-            expect(trader2Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('5', 'ether'));
-            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('5', 'ether'));
+            expect(trader4Balance.locked).to.be.equals(toEthUnit('10'));
+            expect(trader2Balance.locked).to.be.equals(toEthUnit('5'));
+            expect(trader3Balance.locked).to.be.equals(toEthUnit('5'));
 
         });
 
@@ -570,41 +567,41 @@ describe('OBDex', () => {
 
             // Check Trader1 BAT Balance 
             let trader1Balance = await getTraderBalance(obdex, bat, trader1);
-            expect(trader1Balance.free).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
-            expect(trader1Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader1Balance.free).to.be.equals(toEthUnit('0'));
+            expect(trader1Balance.locked).to.be.equals(toEthUnit('0'));
             
             // Trader1 BUY 100 BAT for price of 3 DAI each => 300 DAI LOCKED
             await obdex.contract.connect(trader1)
-                .createLimitOrder(BAT, hre.ethers.utils.parseUnits('100', 'ether'), 3, ORDER_SIDE.BUY);
+                .createLimitOrder(BAT, toEthUnit('100'), 3, ORDER_SIDE.BUY);
             
             // Check Trader1 Locked DAI Balance 
             trader1Balance = await getTraderBalance(obdex, dai, trader1);
-            expect(trader1Balance.free).to.be.equals(hre.ethers.utils.parseUnits('700', 'ether'));
-            expect(trader1Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('300', 'ether'));
+            expect(trader1Balance.free).to.be.equals(toEthUnit('700'));
+            expect(trader1Balance.locked).to.be.equals(toEthUnit('300'));
 
             // Trader3 SELL 150 BAT for price of 3 DAI each => 150 DAI LOCKED
             await obdex.contract.connect(trader3)
-                .createLimitOrder(BAT, hre.ethers.utils.parseUnits('150', 'ether'), 3, ORDER_SIDE.SELL);
+                .createLimitOrder(BAT, toEthUnit('150',), 3, ORDER_SIDE.SELL);
 
             // Check Trader3 New DAI Balance 
             let trader3Balance = await getTraderBalance(obdex, dai, trader3);
-            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('300', 'ether'));
-            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader3Balance.free).to.be.equals(toEthUnit('300'));
+            expect(trader3Balance.locked).to.be.equals(toEthUnit('0'));
 
             // Check Trader3 New BAT Balance 
             trader3Balance = await getTraderBalance(obdex, bat, trader3);
-            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('850', 'ether'));
-            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('50', 'ether'));
+            expect(trader3Balance.free).to.be.equals(toEthUnit('850'));
+            expect(trader3Balance.locked).to.be.equals(toEthUnit('50'));
 
             // Check Trader1 New DAI Balance
             trader1Balance = await getTraderBalance(obdex, dai, trader1);
-            expect(trader1Balance.free).to.be.equals(hre.ethers.utils.parseUnits('700', 'ether'));
-            expect(trader1Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader1Balance.free).to.be.equals(toEthUnit('700'));
+            expect(trader1Balance.locked).to.be.equals(toEthUnit('0'));
             
             // Check Trader1 New BAT Balance
             trader1Balance = await getTraderBalance(obdex, bat, trader1);
-            expect(trader1Balance.free).to.be.equals(hre.ethers.utils.parseUnits('100', 'ether'));
-            expect(trader1Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader1Balance.free).to.be.equals(toEthUnit('100'));
+            expect(trader1Balance.locked).to.be.equals(toEthUnit('0'));
             
             // Check BAT BUY Orders
             let buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
@@ -613,52 +610,52 @@ describe('OBDex', () => {
             // Check BAT SELL Orders
             let sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.SELL);
             expect(sellOrders.length).to.be.equals(1);
-            expect(sellOrders[0].amount).to.be.equals(hre.ethers.utils.parseUnits('150', 'ether'));
+            expect(sellOrders[0].amount).to.be.equals(toEthUnit('150'));
             expect(sellOrders[0].fills.length).to.be.equals(1);
-            expect(sellOrders[0].fills[0]).to.be.equals(hre.ethers.utils.parseUnits('100', 'ether'));
+            expect(sellOrders[0].fills[0]).to.be.equals(toEthUnit('100'));
 
             // Check Trader3 REP Balance 
             trader3Balance = await getTraderBalance(obdex, rep, trader3);
-            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
-            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader3Balance.free).to.be.equals(toEthUnit('0'));
+            expect(trader3Balance.locked).to.be.equals(toEthUnit('0'));
             
             // Trader3 BUY 10 REP for price of 10 DAI each => 100 DAI LOCKED
             await obdex.contract.connect(trader3)
-                .createLimitOrder(REP, hre.ethers.utils.parseUnits('10', 'ether'), 10, ORDER_SIDE.BUY);
+                .createLimitOrder(REP, toEthUnit('10'), 10, ORDER_SIDE.BUY);
             
             // Check Trader3 Locked DAI Balance 
             trader3Balance = await getTraderBalance(obdex, dai, trader3);
-            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('200', 'ether'));
-            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('100', 'ether'));
+            expect(trader3Balance.free).to.be.equals(toEthUnit('200'));
+            expect(trader3Balance.locked).to.be.equals(toEthUnit('100'));
             
             // Check Trader2 DAI Balance 
             let trader2Balance = await getTraderBalance(obdex, dai, trader2);
-            expect(trader2Balance.free).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
-            expect(trader2Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader2Balance.free).to.be.equals(toEthUnit('0'));
+            expect(trader2Balance.locked).to.be.equals(toEthUnit('0'));
             
             // Trader2 SELL 100 REP for price of 10 DAI each => 100 REP LOCKED
             await obdex.contract.connect(trader2)
-                .createLimitOrder(REP, hre.ethers.utils.parseUnits('100', 'ether'), 10, ORDER_SIDE.SELL);
+                .createLimitOrder(REP, toEthUnit('100'), 10, ORDER_SIDE.SELL);
             
             // Check Trader3 New DAI Balance 
             trader3Balance = await getTraderBalance(obdex, dai, trader3);
-            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('200', 'ether'));
-            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader3Balance.free).to.be.equals(toEthUnit('200'));
+            expect(trader3Balance.locked).to.be.equals(toEthUnit('0'));
 
             // Check Trader3 New REP Balance 
             trader3Balance = await getTraderBalance(obdex, rep, trader3);
-            expect(trader3Balance.free).to.be.equals(hre.ethers.utils.parseUnits('10', 'ether'));
-            expect(trader3Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader3Balance.free).to.be.equals(toEthUnit('10'));
+            expect(trader3Balance.locked).to.be.equals(toEthUnit('0'));
 
             // Check Trader2 New DAI Balance
             trader2Balance = await getTraderBalance(obdex, dai, trader2);
-            expect(trader2Balance.free).to.be.equals(hre.ethers.utils.parseUnits('100', 'ether'));
-            expect(trader2Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('0', 'ether'));
+            expect(trader2Balance.free).to.be.equals(toEthUnit('100'));
+            expect(trader2Balance.locked).to.be.equals(toEthUnit('0'));
             
             // Check Trader2 New REP Balance
             trader2Balance = await getTraderBalance(obdex, rep, trader2);
-            expect(trader2Balance.free).to.be.equals(hre.ethers.utils.parseUnits('900', 'ether'));
-            expect(trader2Balance.locked).to.be.equals(hre.ethers.utils.parseUnits('90', 'ether'));
+            expect(trader2Balance.free).to.be.equals(toEthUnit('900'));
+            expect(trader2Balance.locked).to.be.equals(toEthUnit('90'));
 
             // Check REP BUY Orders
             buyOrders = await obdex.contract.getOrders(REP, ORDER_SIDE.BUY);
@@ -667,9 +664,9 @@ describe('OBDex', () => {
             // Check REP SELL Orders
             sellOrders = await obdex.contract.getOrders(REP, ORDER_SIDE.SELL);
             expect(sellOrders.length).to.be.equals(1);
-            expect(sellOrders[0].amount).to.be.equals(hre.ethers.utils.parseUnits('100', 'ether'));
+            expect(sellOrders[0].amount).to.be.equals(toEthUnit('100'));
             expect(sellOrders[0].fills.length).to.be.equals(1);
-            expect(sellOrders[0].fills[0]).to.be.equals(hre.ethers.utils.parseUnits('10', 'ether'));
+            expect(sellOrders[0].fills[0]).to.be.equals(toEthUnit('10'));
         });
     });
 
@@ -690,7 +687,7 @@ describe('OBDex', () => {
             await obdex.contract.connect(owner).addToken(BAT, bat.contract.address);
             await obdex.contract.connect(owner).addToken(ZRX, zrx.contract.address);
             
-            amount = hre.ethers.utils.parseUnits('1000', 'ether');
+            amount = toEthUnit('1000');
             
             await seedTraderWallet(obdex, trader1, [dai], amount);
             await obdex.contract.connect(trader1).deposit(DAI, amount);
@@ -785,7 +782,7 @@ describe('OBDex', () => {
             await loadFixture(marketFixture);
 
             const obdexBalances = await getTraderBalance(obdex, dai, trader1)
-            expect(obdexBalances.free).to.be.equals(hre.ethers.utils.parseUnits('1000', 'ether'));
+            expect(obdexBalances.free).to.be.equals(toEthUnit('1000'));
             expect(obdexBalances.locked).to.be.equals(0);
 
             const sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
