@@ -160,17 +160,42 @@ contract OBDex {
 
     // TBT
     // --- Cancle Order ---
-    function cancelOrder(bytes32 ticker, uint orderId, ORDER_SIDE side) 
-        external canCancel(ticker, orderId, side) {
+    function cancelOrder(bytes32 _ticker, uint _orderId, ORDER_SIDE _side) 
+        external {
+    
+        Order[] storage orders = orderBook[_ticker][uint(_side)];
+
+        uint orderIndex;
+        bool orderFound = false;
         
-        Order[] storage orders = orderBook[ticker][uint(side)];
-        Order storage order = orders[orderId];
+        // Look for order index with id = _orderId
+        for (uint i = 0; i < orders.length; i = i.add(1)) {
+            if (orders[i].id == _orderId) {
+                orderIndex = i;
+                orderFound = true;
+                break;
+            }
+        }
+
+        require(orderFound == true, "Order Not Found!");
+
+        Order memory order = orders[orderIndex];
+        require(order.orderType == ORDER_TYPE.LIMIT, "Only Limit Orders can be canceled");
+        require(order.traderAddress == msg.sender, "Only the order trader can cancel the order");        
 
         uint filledAmount = amountFilled(order);
         uint amoutToUnlock = order.amount.sub(filledAmount);
 
-        lockUnlockTokens(ticker, amoutToUnlock, order.price, order.orderSide, order.orderType, LOCKING.UNLOCK);
-        delete orders[orderId]; 
+        if (amoutToUnlock > 0) {
+            lockUnlockTokens(_ticker, amoutToUnlock, order.price, order.orderSide, order.orderType, LOCKING.UNLOCK);
+        }
+
+        for (uint i = orderIndex; i < orders.length.sub(1); i = i.add(1)) {
+            uint nextElementIndex = i.add(1);
+            orders[i] = orders[nextElementIndex];
+        }
+
+        orders.pop();
     }
 
     // --- Lock And Unlock Tokens ---
@@ -267,10 +292,10 @@ contract OBDex {
         while(index < otherSideOrders.length && remaining > 0) {
 
             if (_orderToMatch.orderType == ORDER_TYPE.MARKET && remaining > 0) {
-                remaining = matchSignleOrder(_orderToMatch, otherSideOrders[index], remaining);
+                    remaining = matchSignleOrder(_orderToMatch, otherSideOrders[index], remaining);
             } else if (_orderToMatch.orderType == ORDER_TYPE.LIMIT && otherSideOrders[index].price == _orderToMatch.price) {
-                remaining = matchSignleOrder(_orderToMatch, otherSideOrders[index], remaining);
-            }
+                    remaining = matchSignleOrder(_orderToMatch, otherSideOrders[index], remaining);
+                }
 
             index = index.add(1);
         }
@@ -482,7 +507,7 @@ contract OBDex {
         bool orderFound = false;
         
         // Look for order index with id = _orderId
-        for (uint i = 0; i <= orders.length; i = i.add(1)) {
+        for (uint i = 0; i < orders.length; i = i.add(1)) {
             if (orders[i].id == _orderId) {
                 orderIndex = i;
                 orderFound = true;
