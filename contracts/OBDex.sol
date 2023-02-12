@@ -235,90 +235,109 @@ contract OBDex {
     function manageOrders(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE _side, ORDER_TYPE _orderType) 
         internal {
         
-        Order storage newOrder = createOrder(_ticker, _side, _orderType, _amount, _price);
+        createOrder(_ticker, _side, _orderType, _amount, _price);
+        Order memory newOrder = orderBook[_ticker][uint(_side)][orderBook[_ticker][uint(_side)].length - 1];
         sortOrders(_ticker, _side);
 
         Order[] storage oppositeOrders = orderBook[_ticker][uint(_side == ORDER_SIDE.BUY ? ORDER_SIDE.SELL : ORDER_SIDE.BUY)];
         if (oppositeOrders.length > 0) {
-            matchOrders(newOrder);
+            Order storage loadedOrder = findOrderById(_ticker, _side, newOrder.id);
+            matchOrders(loadedOrder);
             cleanOrders(_ticker);
         }
     }
 
     // --- Create Orders ---
     function createOrder(bytes32 _ticker, ORDER_SIDE _side, ORDER_TYPE _orderType, uint _amount, uint _price) 
-        internal returns(Order storage) {
+        internal {
         
         uint[] memory fills;
 
-        Order memory order = Order(nextOrderId, msg.sender, _side, _orderType, _ticker, _amount, fills, _price, block.timestamp);
-        orderBook[_ticker][uint(_side)].push(order);
+        orderBook[_ticker][uint(_side)].push(
+            Order(nextOrderId, msg.sender, _side, _orderType, _ticker, _amount, fills, _price, block.timestamp)
+        );
         nextOrderId = nextOrderId.add(1);
-
-        Order storage newOrder = orderBook[_ticker][uint(_side)][orderBook[_ticker][uint(_side)].length - 1];
-        return newOrder;
     }
 
     // --- Sort Orders ---
     function sortOrders(bytes32 _ticker, ORDER_SIDE _side) 
-        internal returns(Order[] storage) {
+        internal {
         
         Order[] storage orders = orderBook[_ticker][uint(_side)];
         uint index = (orders.length > 0) ? (orders.length - 1) : 0;
         
         // SORT BY PRICE
         while(index > 0) {
-            if (orders[index - 1].price < orders[index].price) {
-                    break;
+            if (orders[index - 1].price > orders[index].price) {
+                Order memory order = orders[index - 1];
+                orders[index - 1] = orders[index];
+                orders[index] = order;
             }
-            Order memory order = orders[index - 1];
-            orders[index - 1] = orders[index];
-            orders[index] = order;
-            index = index.sub(1);
+            index = index.sub(1);       
+        }
+    }
+
+    function findOrderById(bytes32 _ticker, ORDER_SIDE _side, uint _orderId) 
+        internal view returns (Order storage) {
+        
+        Order[] storage orders = orderBook[_ticker][uint(_side)];
+
+        uint orderIndex;
+        bool orderFound = false;
+        
+        // Look for order index with id = _orderId
+        for (uint i = 0; i < orders.length; i = i.add(1)) {
+            if (orders[i].id == _orderId) {
+                orderIndex = i;
+                orderFound = true;
+                break;
+            }
         }
 
-        return orders;
+        require(orderFound == true, "Order Not Found!");
+
+        return orders[orderIndex];
     }
 
     // --- Match New Order Agaist Existing Opposite Orders ---
     function matchOrders(Order storage _orderToMatch) internal {
-        Order[] storage otherSideOrders = orderBook[_orderToMatch.ticker][
+        Order[] storage oppositeOrders = orderBook[_orderToMatch.ticker][
             uint(_orderToMatch.orderSide == ORDER_SIDE.BUY ? ORDER_SIDE.SELL : ORDER_SIDE.BUY)
         ];
         
         uint index;
         uint remaining = _orderToMatch.amount;
-
-        while(index < otherSideOrders.length && remaining > 0) {
+        
+        while(index < oppositeOrders.length && remaining > 0) {
 
             if (_orderToMatch.orderType == ORDER_TYPE.MARKET && remaining > 0) {
-                    remaining = matchSignleOrder(_orderToMatch, otherSideOrders[index], remaining);
-            } else if (_orderToMatch.orderType == ORDER_TYPE.LIMIT && otherSideOrders[index].price == _orderToMatch.price) {
-                    remaining = matchSignleOrder(_orderToMatch, otherSideOrders[index], remaining);
-                }
+                matchSingleOrder(_orderToMatch, oppositeOrders[index], remaining);
+
+            } else if (_orderToMatch.orderType == ORDER_TYPE.LIMIT && oppositeOrders[index].price == _orderToMatch.price) {
+                matchSingleOrder(_orderToMatch, oppositeOrders[index], remaining);
+            }
+
+            remaining = _orderToMatch.amount.sub(amountFilled(_orderToMatch));
 
             index = index.add(1);
         }
     }
 
     // --- Execute The Orders Matching ---
-    function matchSignleOrder(Order storage _orderToMatch, Order storage _oppositeOrder, uint _remaining) internal returns(uint) {
+    function matchSingleOrder(Order storage _orderToMatch, Order storage _oppositeOrder, uint _remaining) internal {
         // How much amount filled
         uint orderAmountFilled = amountFilled(_oppositeOrder);
-        
+
         // How much amount available
         uint available = SafeMath.sub(_oppositeOrder.amount, orderAmountFilled);
         // How much amount matched
         uint matched = (_remaining > available) ? available : _remaining;
-        uint remaining = SafeMath.sub(_remaining, matched);
 
         _oppositeOrder.fills.push(matched);
         _orderToMatch.fills.push(matched);
         adjustBalances(_orderToMatch, matched, _oppositeOrder);
         
         emitNewTradeEvent(_orderToMatch, _oppositeOrder, matched);
-
-        return remaining;
     }
 
     // --- Emit New Trade Event ---
@@ -389,10 +408,11 @@ contract OBDex {
                 isOffset = true;
             }
             
-            orders.pop();
             if(!isOffset) {
                 index = index.add(1);
             }
+
+            orders.pop();
         }
     }
 
@@ -496,29 +516,6 @@ contract OBDex {
         // since we need opposite orders to exist for the matching to happen
         Order[] memory orders = orderBook[_ticker][uint(_side == ORDER_SIDE.BUY ? ORDER_SIDE.SELL : ORDER_SIDE.BUY)];
         require(orders.length > 0, "Empty Order Book! Please Create Limit Order!");
-        _;
-    }
-
-    // --- Modifier: Checks If Order Can Be Canceled ---
-    modifier canCancel(bytes32 _ticker, uint _orderId, ORDER_SIDE _side) {
-        Order[] memory orders = orderBook[_ticker][uint(_side)];
-
-        uint orderIndex;
-        bool orderFound = false;
-        
-        // Look for order index with id = _orderId
-        for (uint i = 0; i < orders.length; i = i.add(1)) {
-            if (orders[i].id == _orderId) {
-                orderIndex = i;
-                orderFound = true;
-            }
-        }
-
-        require(orderFound == true, "Order Not Found!");
-
-        Order memory order = orders[orderIndex];
-        require(order.orderType == ORDER_TYPE.LIMIT, "Only Limit Orders can be canceled");
-        require(order.traderAddress == msg.sender, "Only the order trader can cancel the order");        
         _;
     }
 
