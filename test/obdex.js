@@ -438,9 +438,9 @@ describe('OBDex', () => {
 
             const buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
             expect(buyOrders.length).to.be.equals(3);
-            assertOrder(buyOrders[0], amountToTrade, 1, trader4, []);
+            assertOrder(buyOrders[0], amountToTrade, 3, trader1, []);
             assertOrder(buyOrders[1], amountToTrade, 2, trader4, []);
-            assertOrder(buyOrders[2], amountToTrade, 3, trader1, []);
+            assertOrder(buyOrders[2], amountToTrade, 1, trader4, []);
 
             await obdex.contract.connect(trader2).createLimitOrder(ZRX, amountToTrade, 3, ORDER_SIDE.SELL);
             await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 1, ORDER_SIDE.SELL);
@@ -465,19 +465,20 @@ describe('OBDex', () => {
 
             let buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
             expect(buyOrders.length).to.be.equals(3);
-            
-            assertOrder(buyOrders[0], amountToTrade, 1, trader4, []);
+
+            // BUY LIMIT ORDERS are sorted by descending price
+            assertOrder(buyOrders[0], amountToTrade, 3, trader1, []);
             assertOrder(buyOrders[1], amountToTrade, 2, trader4, []);
-            assertOrder(buyOrders[2], amountToTrade, 3, trader1, []);
+            assertOrder(buyOrders[2], amountToTrade, 1, trader4, []);
 
             // Trader1 Cancel his order with price = 3
             await obdex.contract.connect(trader4).cancelOrder(BAT, buyOrders[1].id, ORDER_SIDE.BUY);
             
             buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
             expect(buyOrders.length).to.be.equals(2);
-            assertOrder(buyOrders[0], amountToTrade, 1, trader4, []);
-            assertOrder(buyOrders[1], amountToTrade, 3, trader1, []);
-
+            assertOrder(buyOrders[0], amountToTrade, 3, trader1, []);
+            assertOrder(buyOrders[1], amountToTrade, 1, trader4, []);
+            
             await obdex.contract.connect(trader2).createLimitOrder(ZRX, amountToTrade, 3, ORDER_SIDE.SELL);
             await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 1, ORDER_SIDE.SELL);
             await obdex.contract.connect(trader3).createLimitOrder(ZRX, amountToTrade, 2, ORDER_SIDE.SELL);
@@ -486,6 +487,7 @@ describe('OBDex', () => {
             let sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
             expect(sellOrders.length).to.be.equals(4);
 
+            // SELL LIMIT ORDERS are sorted by ascending price
             assertOrder(sellOrders[0], amountToTrade, 1, trader4, []);
             assertOrder(sellOrders[1], amountToTrade, 2, trader3, []);
             assertOrder(sellOrders[2], amountToTrade, 3, trader2, []);
@@ -535,9 +537,10 @@ describe('OBDex', () => {
             // BUY Orders BAT
             let buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
             expect(buyOrders.length).to.be.equals(3);
-            assertOrder(buyOrders[0], amountToTrade, 1, trader4, ['10']);
+            
+            assertOrder(buyOrders[0], amountToTrade, 3, trader1, ['10']);
             assertOrder(buyOrders[1], amountToTrade, 2, trader4, ['10']);
-            assertOrder(buyOrders[2], amountToTrade, 3, trader1, ['10']);
+            assertOrder(buyOrders[2], amountToTrade, 1, trader4, ['10']);
 
             // SELL Orders BAT
             let sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.SELL);
@@ -552,16 +555,17 @@ describe('OBDex', () => {
             // BUY Orders BAT
             buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
             expect(buyOrders.length).to.be.equals(2);
-            assertOrder(buyOrders[0], amountToTrade, 1, trader4, ['10']);
-            assertOrder(buyOrders[1], amountToTrade, 3, trader1, ['10']);
+            
+            assertOrder(buyOrders[0], amountToTrade, 3, trader1, ['10']);
+            assertOrder(buyOrders[1], amountToTrade, 1, trader4, ['10']);
 
             // Trader1 Cancel Order
-            await obdex.contract.connect(trader1).cancelOrder(BAT, buyOrders[1].id, ORDER_SIDE.BUY);
+            await obdex.contract.connect(trader4).cancelOrder(BAT, buyOrders[1].id, ORDER_SIDE.BUY);
             
             // BUY Orders BAT
             buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
             expect(buyOrders.length).to.be.equals(1);
-            assertOrder(buyOrders[0], amountToTrade, 1, trader4, ['10']);
+            assertOrder(buyOrders[0], amountToTrade, 3, trader1, ['10']);
 
             // Trader4 Balance DAI
             assertTraderBalance(obdex, dai, trader1, '970', '0');
@@ -822,9 +826,7 @@ describe('OBDex', () => {
         it('Should NOT create SELL Market Order if LOW Token Balance', async () => {
             await loadFixture(marketFixture);
 
-            const obdexBalances = await getTraderBalance(obdex, bat, trader1)
-            expect(obdexBalances.free).to.be.equals(0);
-            expect(obdexBalances.locked).to.be.equals(0);
+            assertTraderBalance(obdex, bat, trader1, '0', '0');
 
             await expect(
                 obdex.contract.connect(trader1).createMarketOrder(
@@ -838,9 +840,7 @@ describe('OBDex', () => {
         it('Should NOT create BUY Market Order if LOW DAI Balance', async () => {
             await loadFixture(marketFixture);
 
-            const obdexBalances = await getTraderBalance(obdex, dai, trader3)
-            expect(obdexBalances.free).to.be.equals(0);
-            expect(obdexBalances.locked).to.be.equals(0);
+            assertTraderBalance(obdex, dai, trader3, '0', '0');
 
             await obdex.contract.connect(trader4)
                 .createLimitOrder(BAT, toEthUnit('1'), 1, ORDER_SIDE.SELL);
@@ -854,11 +854,9 @@ describe('OBDex', () => {
         it('Should NOT create BUY market order if EMPTY Order Book', async () => {
             await loadFixture(marketFixture);
 
-            const obdexBalances = await getTraderBalance(obdex, dai, trader1)
-            expect(obdexBalances.free).to.be.equals(toEthUnit('1000'));
-            expect(obdexBalances.locked).to.be.equals(0);
+            assertTraderBalance(obdex, dai, trader1, '1000', '0');
 
-            const sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            const sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.SELL);
             expect(sellOrders.length).to.be.equals(0);
 
             await expect(
@@ -870,24 +868,101 @@ describe('OBDex', () => {
             ).to.be.revertedWith('Empty Order Book! Please Create Limit Order!');
         });
 
-        // TBD
-        it('Should match BUY Market Order against existing Orders (BUY Market Order Amount > SELL Orders Amount)', async () => {
+        it('Should match BUY Market Order against existing Orders', async () => {
+            await loadFixture(marketFixture);
+
+            const amountToTrade = toEthUnit('50');
+            await obdex.contract.connect(trader2).createLimitOrder(ZRX, amountToTrade, 2, ORDER_SIDE.SELL);
+            await obdex.contract.connect(trader3).createLimitOrder(ZRX, amountToTrade, 3, ORDER_SIDE.SELL);
+            await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 4, ORDER_SIDE.SELL);
+
+            assertTraderBalance(obdex, zrx, trader2, '950', '50');
+            assertTraderBalance(obdex, zrx, trader3, '950', '50');
+            assertTraderBalance(obdex, zrx, trader4, '950', '50');
+
+            let buyOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(0);
+
+            let sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(3);
+
+            assertOrder(sellOrders[0], amountToTrade, 2, trader2, [], ORDER_SIDE.SELL, ORDER_TYPE.LIMIT);
+            assertOrder(sellOrders[1], amountToTrade, 3, trader3, [], ORDER_SIDE.SELL, ORDER_TYPE.LIMIT);
+            assertOrder(sellOrders[2], amountToTrade, 4, trader4, [], ORDER_SIDE.SELL, ORDER_TYPE.LIMIT);
+
+            const amountToBuy = toEthUnit('200');
+            await obdex.contract.connect(trader1).createMarketOrder(ZRX, amountToBuy, ORDER_SIDE.BUY);
+
+            buyOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(0);
+
+            sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(0);
+
+            assertTraderBalance(obdex, zrx, trader1, '150', '0');
+            assertTraderBalance(obdex, zrx, trader2, '950', '0');
+            assertTraderBalance(obdex, zrx, trader3, '950', '0');
+            assertTraderBalance(obdex, zrx, trader4, '950', '0');
+
+            assertTraderBalance(obdex, dai, trader1, '550', '0');
+            assertTraderBalance(obdex, dai, trader2, '100', '0');
+            assertTraderBalance(obdex, dai, trader3, '150', '0');
+            assertTraderBalance(obdex, dai, trader4, '1200', '0');
 
         });
 
-        // TBD
-        it('Should match BUY Market Order against existant Orders (BUY Market Order Amount < SELL Orders Amount)', async () => {
+        it('Should match SELL Market Order against existing Orders', async () => {
+            await loadFixture(marketFixture);
 
-        });
+            const amountToTrade = toEthUnit('50');
+            await obdex.contract.connect(trader1).createLimitOrder(ZRX, amountToTrade, 2, ORDER_SIDE.BUY);
+            await obdex.contract.connect(trader1).createLimitOrder(ZRX, amountToTrade, 7, ORDER_SIDE.BUY);
+            await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 3, ORDER_SIDE.BUY);
+            await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 4, ORDER_SIDE.BUY);
 
-        // TBD
-        it('Should match SELL Market Order against existing Orders (SELL Market Order Amount > BUY Orders Amount) ', async () => {
+            assertTraderBalance(obdex, dai, trader1, '550', '450');
+            assertTraderBalance(obdex, dai, trader4, '650', '350');
 
-        });
+            let buyOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(4);
 
-        // TBD
-        it('Should match SELL Market Order against existing Orders (SELL Market Order Amount < BUY Orders Amount)', async () => {
+            assertOrder(buyOrders[0], amountToTrade, 7, trader1, [], ORDER_SIDE.BUY, ORDER_TYPE.LIMIT);
+            assertOrder(buyOrders[1], amountToTrade, 4, trader4, [], ORDER_SIDE.BUY, ORDER_TYPE.LIMIT);
+            assertOrder(buyOrders[2], amountToTrade, 3, trader4, [], ORDER_SIDE.BUY, ORDER_TYPE.LIMIT);
+            assertOrder(buyOrders[3], amountToTrade, 2, trader1, [], ORDER_SIDE.BUY, ORDER_TYPE.LIMIT);
             
+            let sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(0);
+
+            await obdex.contract.connect(trader2).createMarketOrder(ZRX, toEthUnit('10'), ORDER_SIDE.SELL);
+            
+            assertTraderBalance(obdex, dai, trader2, '70', '0');
+            assertTraderBalance(obdex, zrx, trader2, '990', '0');
+
+            buyOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(4);
+            assertOrder(buyOrders[0], amountToTrade, 7, trader1, ['10']);
+
+            await obdex.contract.connect(trader2).createMarketOrder(ZRX, toEthUnit('100'), ORDER_SIDE.SELL);
+
+            assertTraderBalance(obdex, dai, trader2, '580', '0');
+            assertTraderBalance(obdex, zrx, trader2, '890', '0');
+
+            buyOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(2);
+            assertOrder(buyOrders[0], amountToTrade, 3, trader4, ['10']);
+            assertOrder(buyOrders[1], amountToTrade, 2, trader1, []);
+
+            await obdex.contract.connect(trader2).createMarketOrder(ZRX, toEthUnit('200'), ORDER_SIDE.SELL);
+            assertTraderBalance(obdex, dai, trader2, '800', '0');
+            assertTraderBalance(obdex, zrx, trader2, '800', '0');
+
+            buyOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(0);
+
+            sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(0);
+
         });
     });
 
