@@ -400,19 +400,23 @@ contract OBDex {
         uint index = 0;
         Order[] storage orders = orderBook[_ticker][uint(_side)];
         
-        while(index < orders.length && (amountFilled(orders[index]) == orders[index].amount || orders[index].orderType == ORDER_TYPE.MARKET)) {
+        while(index < orders.length) {
+
             bool isOffset = false;
 
-            for(uint j = index; j < orders.length - 1; j = j.add(1)) {
-                orders[j] = orders[j + 1];
-                isOffset = true;
+            if (amountFilled(orders[index]) == orders[index].amount || orders[index].orderType == ORDER_TYPE.MARKET) {
+                
+                for(uint j = index; j < orders.length - 1; j = j.add(1)) {
+                    orders[j] = orders[j + 1];
+                    isOffset = true;
+                }
+
+                orders.pop();
             }
-            
+
             if(!isOffset) {
                 index = index.add(1);
             }
-
-            orders.pop();
         }
     }
 
