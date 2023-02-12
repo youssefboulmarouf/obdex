@@ -871,16 +871,24 @@ describe('OBDex', () => {
         });
 
         // TBD
-        it('Should match BUY Market Order against existing Orders (BUY Market Order Amount > SELL Orders Amount)', async () => {});
+        it('Should match BUY Market Order against existing Orders (BUY Market Order Amount > SELL Orders Amount)', async () => {
+
+        });
 
         // TBD
-        it('Should match BUY Market Order against existant Orders (BUY Market Order Amount < SELL Orders Amount)', async () => {});
+        it('Should match BUY Market Order against existant Orders (BUY Market Order Amount < SELL Orders Amount)', async () => {
+
+        });
 
         // TBD
-        it('Should match SELL Market Order against existing Orders (SELL Market Order Amount > BUY Orders Amount) ', async () => {});
+        it('Should match SELL Market Order against existing Orders (SELL Market Order Amount > BUY Orders Amount) ', async () => {
+
+        });
 
         // TBD
-        it('Should match SELL Market Order against existing Orders (SELL Market Order Amount < BUY Orders Amount)', async () => {});
+        it('Should match SELL Market Order against existing Orders (SELL Market Order Amount < BUY Orders Amount)', async () => {
+            
+        });
     });
 
 });
