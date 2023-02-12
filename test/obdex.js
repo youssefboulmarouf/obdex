@@ -43,6 +43,33 @@ describe('OBDex', () => {
         return hre.ethers.utils.parseUnits(amount, 'ether')
     }
 
+    const assertTraderBalance = async (obdex, token, trader, expectedFreeBalance, expectedLockedBalance) => {
+        const trader1Balance = await getTraderBalance(obdex, token, trader);
+        expect(trader1Balance.free).to.be.equals(toEthUnit(expectedFreeBalance));
+        expect(trader1Balance.locked).to.be.equals(toEthUnit(expectedLockedBalance));
+    }
+
+    const assertOrder = (order, amount, price, trader, fills, orderSide, orderType) => {
+        expect(order.amount).to.be.equals(amount);
+        expect(order.price).to.be.equals(price);
+        expect(order.traderAddress).to.be.equals(trader.address);
+        expect(order.fills.length).to.be.equals(fills.length);
+
+        if (fills.length > 0) {
+            for (let i = 0; i < fills.length; i++) {
+                expect(order.fills[i]).to.be.equals(toEthUnit(fills[i]));
+            }
+        }
+
+        if(orderSide) { // This is Optional
+            expect(order.orderSide).to.be.equals(orderSide);
+        }
+
+        if(orderType) { // This is Optional
+            expect(order.orderType).to.be.equals(orderType);
+        }        
+    }
+
     describe('Token', () => {
         let obdex, dai, owner, trader;
 
@@ -137,11 +164,9 @@ describe('OBDex', () => {
             await obdex.contract.connect(trader).deposit(DAI, amount);
 
             // Balances
-            const obdexBalances = await getTraderBalance(obdex, dai, trader);
-            const daiBalance = await dai.contract.balanceOf(trader.address);
+            assertTraderBalance(obdex, dai, trader, '1000', '0');
 
-            expect(obdexBalances.free).to.be.equals(amount);
-            expect(obdexBalances.locked).to.be.equals(0);
+            const daiBalance = await dai.contract.balanceOf(trader.address);
             expect(daiBalance).to.be.equals(0);
         });
     });
@@ -167,17 +192,17 @@ describe('OBDex', () => {
         it('Should withdraw if enough Balance', async() => {
             await loadFixture(withdrawFixture);
 
-            let obdexBalances = await getTraderBalance(obdex, dai, trader);
+            assertTraderBalance(obdex, dai, trader, '1000', '0');
+
             let daiBalance = await dai.contract.balanceOf(trader.address);
-            expect(obdexBalances.free).to.be.equals(amount);
             expect(daiBalance).to.be.equals(0);
 
             const withdrawAmount = toEthUnit('100');
             await obdex.contract.connect(trader).withdraw(DAI, withdrawAmount);
 
-            obdexBalances = await getTraderBalance(obdex, dai, trader);
+            assertTraderBalance(obdex, dai, trader, '900', '0');
+
             daiBalance = await dai.contract.balanceOf(trader.address);
-            expect(obdexBalances.free).to.be.equals(toEthUnit('900'));
             expect(daiBalance).to.be.equals(withdrawAmount);
         });
 
@@ -229,22 +254,21 @@ describe('OBDex', () => {
             await loadFixture(balanceFixture);
             
             // Trader 1 Balances
-            let obdexDaiBalances = await getTraderBalance(obdex, dai, trader1);
-            let obdexRepBalances = await getTraderBalance(obdex, rep, trader1);
+            assertTraderBalance(obdex, dai, trader1, '1000', '0');
+            assertTraderBalance(obdex, rep, trader1, '0', '0');
+
             let daiBalance = await dai.contract.balanceOf(trader1.address);
-            let repBalance = await rep.contract.balanceOf(trader1.address);
-            expect(obdexDaiBalances.free).to.be.equals(amount);
-            expect(obdexRepBalances.free).to.be.equals(0);
             expect(daiBalance).to.be.equals(0);
+            
+            let repBalance = await rep.contract.balanceOf(trader1.address);
             expect(repBalance).to.be.equals(amount);
 
             // Trader 2 Balances
-            obdexDaiBalances = await getTraderBalance(obdex, dai, trader2);
-            obdexRepBalances = await getTraderBalance(obdex, rep, trader2);
+            assertTraderBalance(obdex, dai, trader2, '0', '0');
+            assertTraderBalance(obdex, rep, trader2, '1000', '0');
+
             daiBalance = await dai.contract.balanceOf(trader2.address);
             repBalance = await rep.contract.balanceOf(trader2.address);
-            expect(obdexDaiBalances.free).to.be.equals(0);
-            expect(obdexRepBalances.free).to.be.equals(amount);
             expect(daiBalance).to.be.equals(amount);
             expect(repBalance).to.be.equals(0);
         });
@@ -252,13 +276,10 @@ describe('OBDex', () => {
         it('Should have empty Balance when Token Does NOT Exist', async () => {
             await loadFixture(balanceFixture);
 
+            const zrx = await deploy('Zrx'); // This token contract is not add to obdex 
+
             // Trader's balance of Token in OBDex Wallet 
-            const obdexBalances = await obdex.contract.balances(
-                trader1.address, 
-                hre.ethers.utils.formatBytes32String('ThisTokenDoesNotExist')
-            );
-            expect(obdexBalances.free).to.be.equals(0);
-            expect(obdexBalances.locked).to.be.equals(0);
+            assertTraderBalance(obdex, zrx, trader1, '0', '0');
         });
     });
 
@@ -391,13 +412,8 @@ describe('OBDex', () => {
 
             buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
             expect(buyOrders.length).to.be.equals(1);
-            expect(buyOrders[0].price).to.be.equals(1);
-            expect(buyOrders[0].amount).to.be.equals(toEthUnit('5'));
-            expect(buyOrders[0].ticker).to.be.equals(BAT);
-            expect(buyOrders[0].traderAddress).to.be.equals(trader1.address);
-            expect(buyOrders[0].orderType).to.be.equals(ORDER_TYPE.LIMIT);
-            expect(buyOrders[0].orderSide).to.be.equals(ORDER_SIDE.BUY);
-            expect(buyOrders[0].fills.length).to.be.equals(0);
+            
+            assertOrder(buyOrders[0],toEthUnit('5'), 1, trader1, [], ORDER_SIDE.BUY, ORDER_TYPE.LIMIT);
 
             // Selling Amount (10 REP) with Price (1 DAI) = 10 DAI => 10 REP to be LOCKED
             await obdex.contract.connect(trader2).createLimitOrder(
@@ -409,13 +425,7 @@ describe('OBDex', () => {
 
             sellOrders = await obdex.contract.getOrders(REP, ORDER_SIDE.SELL);
             expect(sellOrders.length).to.be.equals(1);
-            expect(sellOrders[0].price).to.be.equals(1);
-            expect(sellOrders[0].amount).to.be.equals(toEthUnit('10'));
-            expect(sellOrders[0].ticker).to.be.equals(REP);
-            expect(sellOrders[0].traderAddress).to.be.equals(trader2.address);
-            expect(sellOrders[0].orderType).to.be.equals(ORDER_TYPE.LIMIT);
-            expect(sellOrders[0].orderSide).to.be.equals(ORDER_SIDE.SELL);
-            expect(sellOrders[0].fills.length).to.be.equals(0);
+            assertOrder(sellOrders[0],toEthUnit('10'), 1, trader2, [], ORDER_SIDE.SELL, ORDER_TYPE.LIMIT);
         });
 
         it('Should create Limit Order and Sort them', async () => {
@@ -428,16 +438,9 @@ describe('OBDex', () => {
 
             const buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
             expect(buyOrders.length).to.be.equals(3);
-
-            expect(buyOrders[0].price).to.be.equals(1);
-            expect(buyOrders[0].traderAddress).to.be.equals(trader4.address);
-
-            expect(buyOrders[1].price).to.be.equals(2);
-            expect(buyOrders[1].traderAddress).to.be.equals(trader4.address);
-
-            expect(buyOrders[2].price).to.be.equals(3);
-            expect(buyOrders[2].traderAddress).to.be.equals(trader1.address);
-            
+            assertOrder(buyOrders[0], amountToTrade, 1, trader4, []);
+            assertOrder(buyOrders[1], amountToTrade, 2, trader4, []);
+            assertOrder(buyOrders[2], amountToTrade, 3, trader1, []);
 
             await obdex.contract.connect(trader2).createLimitOrder(ZRX, amountToTrade, 3, ORDER_SIDE.SELL);
             await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 1, ORDER_SIDE.SELL);
@@ -446,23 +449,13 @@ describe('OBDex', () => {
 
             const sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
             expect(sellOrders.length).to.be.equals(4);
-
-            expect(sellOrders[0].price).to.be.equals(1);
-            expect(sellOrders[0].traderAddress).to.be.equals(trader4.address);
-            
-            expect(sellOrders[1].price).to.be.equals(2);
-            expect(sellOrders[1].traderAddress).to.be.equals(trader3.address);
-            
-            expect(sellOrders[2].price).to.be.equals(3);
-            expect(sellOrders[2].traderAddress).to.be.equals(trader2.address);
-
-            expect(sellOrders[3].price).to.be.equals(7);
-            expect(sellOrders[3].traderAddress).to.be.equals(trader4.address);
-
+            assertOrder(sellOrders[0], amountToTrade, 1, trader4, []);
+            assertOrder(sellOrders[1], amountToTrade, 2, trader3, []);
+            assertOrder(sellOrders[2], amountToTrade, 3, trader2, []);
+            assertOrder(sellOrders[3], amountToTrade, 7, trader4, []);
         });
 
-        // TBF
-        it('Should Cancel Limit Order', async () => {
+        it('Should Cancel BUY and SELL Limit Order', async () => {
             await loadFixture(limitFixture);
 
             const amountToTrade = toEthUnit('5');
@@ -472,59 +465,184 @@ describe('OBDex', () => {
 
             let buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
             expect(buyOrders.length).to.be.equals(3);
-
-            expect(buyOrders[2].price).to.be.equals(3);
-            expect(buyOrders[2].traderAddress).to.be.equals(trader1.address);
-
-            //console.log('buyOrders2: ', buyOrders[2]);
-            //console.log('trader1.address: ', trader1.address);
-
+            
+            assertOrder(buyOrders[0], amountToTrade, 1, trader4, []);
+            assertOrder(buyOrders[1], amountToTrade, 2, trader4, []);
+            assertOrder(buyOrders[2], amountToTrade, 3, trader1, []);
 
             // Trader1 Cancel his order with price = 3
-            //await obdex.contract.connect(trader1).cancelOrder(BAT, buyOrders[2].id, ORDER_SIDE.BUY);
+            await obdex.contract.connect(trader4).cancelOrder(BAT, buyOrders[1].id, ORDER_SIDE.BUY);
             
-            //buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
-            // expect(buyOrders.length).to.be.equals(2);
+            buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(2);
+            assertOrder(buyOrders[0], amountToTrade, 1, trader4, []);
+            assertOrder(buyOrders[1], amountToTrade, 3, trader1, []);
 
-            // expect(buyOrders[0].price).to.be.equals(1);
-            // expect(buyOrders[0].traderAddress).to.be.equals(trader4.address);
+            await obdex.contract.connect(trader2).createLimitOrder(ZRX, amountToTrade, 3, ORDER_SIDE.SELL);
+            await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 1, ORDER_SIDE.SELL);
+            await obdex.contract.connect(trader3).createLimitOrder(ZRX, amountToTrade, 2, ORDER_SIDE.SELL);
+            await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 7, ORDER_SIDE.SELL);
 
-            // expect(buyOrders[1].price).to.be.equals(2);
-            // expect(buyOrders[1].traderAddress).to.be.equals(trader4.address);
+            let sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(4);
 
-            // await obdex.contract.connect(trader2).createLimitOrder(ZRX, amountToTrade, 3, ORDER_SIDE.SELL);
-            // await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 1, ORDER_SIDE.SELL);
-            // await obdex.contract.connect(trader3).createLimitOrder(ZRX, amountToTrade, 2, ORDER_SIDE.SELL);
-            // await obdex.contract.connect(trader4).createLimitOrder(ZRX, amountToTrade, 7, ORDER_SIDE.SELL);
+            assertOrder(sellOrders[0], amountToTrade, 1, trader4, []);
+            assertOrder(sellOrders[1], amountToTrade, 2, trader3, []);
+            assertOrder(sellOrders[2], amountToTrade, 3, trader2, []);
+            assertOrder(sellOrders[3], amountToTrade, 7, trader4, []);
 
-            // let sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
-            // expect(sellOrders.length).to.be.equals(4);
+            // Trader1 Cancel his order with price = 3
+            await obdex.contract.connect(trader3).cancelOrder(ZRX, sellOrders[1].id, ORDER_SIDE.SELL);
 
-            // expect(sellOrders[1].price).to.be.equals(2);
-            // expect(sellOrders[1].traderAddress).to.be.equals(trader3.address);
+            sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(3);
 
-            // // Trader1 Cancel his order with price = 3
-            // await obdex.contract.connect(trader3).cancelOrder(ZRX, buyOrders[1].id, ORDER_SIDE.BUY);
-
-            // sellOrders = await obdex.contract.getOrders(ZRX, ORDER_SIDE.SELL);
-            // expect(sellOrders.length).to.be.equals(3);
-            
-            // expect(sellOrders[0].price).to.be.equals(1);
-            // expect(sellOrders[0].traderAddress).to.be.equals(trader4.address);
-            
-            // expect(sellOrders[1].price).to.be.equals(3);
-            // expect(sellOrders[1].traderAddress).to.be.equals(trader2.address);
-
-            // expect(sellOrders[2].price).to.be.equals(7);
-            // expect(sellOrders[2].traderAddress).to.be.equals(trader4.address);
+            assertOrder(sellOrders[0], amountToTrade, 1, trader4, []);
+            assertOrder(sellOrders[1], amountToTrade, 3, trader2, []);
+            assertOrder(sellOrders[2], amountToTrade, 7, trader4, []);
 
         });
 
-        // TBD
-        it('Should NOT Cancel NON Existing Limit Order', async () => {});
+        it('Should Cancel BUY and SELL Limit and have the correct Balance (BUY then SELL)', async () => {
+            await loadFixture(limitFixture);
 
-        // TBD
-        it('Should NOT Cancel Limit Order if NOT order Trader (Order Owner)', async () => {});
+            // Open BUY Orders
+            const amountToTrade = toEthUnit('50');
+            await obdex.contract.connect(trader1).createLimitOrder(BAT, amountToTrade, 3, ORDER_SIDE.BUY); // 150 DAI Locked
+            await obdex.contract.connect(trader4).createLimitOrder(BAT, amountToTrade, 1, ORDER_SIDE.BUY); // 50 DAI Locked
+            await obdex.contract.connect(trader4).createLimitOrder(BAT, amountToTrade, 2, ORDER_SIDE.BUY); // 100 DAI Locked
+
+            assertTraderBalance(obdex, dai, trader1, '850', '150'); // order with price 3
+            assertTraderBalance(obdex, dai, trader4, '850', '150'); // order with price 1 & 2
+
+            // Open SELL Orders
+            await obdex.contract.connect(trader3).createLimitOrder(BAT, toEthUnit('10'), 3, ORDER_SIDE.SELL); // 10 BAT Locked
+            await obdex.contract.connect(trader3).createLimitOrder(BAT, toEthUnit('10'), 2, ORDER_SIDE.SELL); // 10 BAT Locked
+            await obdex.contract.connect(trader3).createLimitOrder(BAT, toEthUnit('10'), 1, ORDER_SIDE.SELL); // 10 BAT Locked
+            
+            // Trader3 Balance DAI, BAT
+            assertTraderBalance(obdex, dai, trader3, '60', '0');
+            assertTraderBalance(obdex, bat, trader3, '970', '0');
+
+            // Trader1 Balance DAI, BAT
+            assertTraderBalance(obdex, dai, trader1, '850', '120');
+            assertTraderBalance(obdex, bat, trader1, '10', '0');
+
+            // Trader4 Balance DAI, BAT
+            assertTraderBalance(obdex, dai, trader4, '850', '120');
+            assertTraderBalance(obdex, bat, trader4, '1020', '0');
+
+            // BUY Orders BAT
+            let buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(3);
+            assertOrder(buyOrders[0], amountToTrade, 1, trader4, ['10']);
+            assertOrder(buyOrders[1], amountToTrade, 2, trader4, ['10']);
+            assertOrder(buyOrders[2], amountToTrade, 3, trader1, ['10']);
+
+            // SELL Orders BAT
+            let sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(0);
+
+            // Trader4 Cancel Order
+            await obdex.contract.connect(trader4).cancelOrder(BAT, buyOrders[1].id, ORDER_SIDE.BUY);
+            
+            // Trader4 Balance DAI
+            assertTraderBalance(obdex, dai, trader4, '930', '40');
+            
+            // BUY Orders BAT
+            buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(2);
+            assertOrder(buyOrders[0], amountToTrade, 1, trader4, ['10']);
+            assertOrder(buyOrders[1], amountToTrade, 3, trader1, ['10']);
+
+            // Trader1 Cancel Order
+            await obdex.contract.connect(trader1).cancelOrder(BAT, buyOrders[1].id, ORDER_SIDE.BUY);
+            
+            // BUY Orders BAT
+            buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(1);
+            assertOrder(buyOrders[0], amountToTrade, 1, trader4, ['10']);
+
+            // Trader4 Balance DAI
+            assertTraderBalance(obdex, dai, trader1, '970', '0');
+            
+        });
+
+        it('Should Cancel BUY and SELL Limit and have the correct Balance (SELL then BUY)', async () => {
+            await loadFixture(limitFixture);
+
+            // Open SELL Orders
+            const amountToTrade = toEthUnit('50');
+            await obdex.contract.connect(trader3).createLimitOrder(BAT, amountToTrade, 3, ORDER_SIDE.SELL); // 50 BAT Locked => 90 dai
+            await obdex.contract.connect(trader3).createLimitOrder(BAT, amountToTrade, 2, ORDER_SIDE.SELL); // 50 BAT Locked => 20
+            await obdex.contract.connect(trader3).createLimitOrder(BAT, amountToTrade, 1, ORDER_SIDE.SELL); // 50 BAT Locked => 50 dai
+
+            // Trader3 Balance BAT
+            assertTraderBalance(obdex, bat, trader3, '850', '150');
+            
+            // Open BUY Orders
+            await obdex.contract.connect(trader1).createLimitOrder(BAT, toEthUnit('30'), 3, ORDER_SIDE.BUY); // 90 DAI Locked
+            await obdex.contract.connect(trader4).createLimitOrder(BAT, toEthUnit('70'), 1, ORDER_SIDE.BUY); // 70 DAI Locked
+            await obdex.contract.connect(trader4).createLimitOrder(BAT, toEthUnit('10'), 2, ORDER_SIDE.BUY); // 20 DAI Locked
+
+            // BUY Orders BAT
+            let buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(1);
+            assertOrder(buyOrders[0], toEthUnit('70'), 1, trader4, ['50']);
+
+            // SELL Orders BAT
+            let sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(2);
+            assertOrder(sellOrders[0], amountToTrade, 2, trader3, ['10']);
+            assertOrder(sellOrders[1], amountToTrade, 3, trader3, ['30']);
+
+            // Trader3 Cancel Order
+            await obdex.contract.connect(trader3).cancelOrder(BAT, sellOrders[0].id, ORDER_SIDE.SELL);
+            
+            // Trader3 Balance BAT
+            assertTraderBalance(obdex, bat, trader3, '890', '20');
+
+            // SELL Orders BAT
+            sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.SELL);
+            expect(sellOrders.length).to.be.equals(1);
+
+            // Trader3 Cancel Order
+            await obdex.contract.connect(trader3).cancelOrder(BAT, sellOrders[0].id, ORDER_SIDE.SELL);
+
+            // Trader3 Balance DAI, BAT
+            assertTraderBalance(obdex, bat, trader3, '910', '0');
+            assertTraderBalance(obdex, dai, trader3, '160', '0');
+
+            // Trader1 Balance DAI, BAT
+            assertTraderBalance(obdex, bat, trader1, '30', '0');
+            assertTraderBalance(obdex, dai, trader1, '910', '0');
+
+            // Trader4 Balance DAI, BAT
+            assertTraderBalance(obdex, dai, trader4, '1060', '0');
+            assertTraderBalance(obdex, dai, trader4, '910', '20');
+        });
+
+        it('Should NOT Cancel NON Existing Limit Order', async () => {
+            await loadFixture(limitFixture);
+            await expect(
+                obdex.contract.connect(trader1).cancelOrder(BAT, 99, ORDER_SIDE.BUY)
+            ).to.be.revertedWith('Order Not Found!');
+        });
+
+        it('Should NOT Cancel Limit Order if NOT order Trader (Order Owner)', async () => {
+            await loadFixture(limitFixture);
+
+            const amountToTrade = toEthUnit('5');
+            await obdex.contract.connect(trader1).createLimitOrder(BAT, amountToTrade, 3, ORDER_SIDE.BUY);
+            
+            let buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
+            expect(buyOrders.length).to.be.equals(1);
+
+            await expect(
+                obdex.contract.connect(trader4).cancelOrder(BAT, buyOrders[0].id, ORDER_SIDE.BUY)
+            ).to.be.revertedWith('Only the order trader can cancel the order');
+            
+        });
 
         it('Should create Limit Order and Lock the correct amount', async () => {
             await loadFixture(limitFixture);
@@ -565,43 +683,25 @@ describe('OBDex', () => {
         it('Should create Limit Order, Match and Clear them', async () => {
             await loadFixture(limitFixture);
 
-            // Check Trader1 BAT Balance 
-            let trader1Balance = await getTraderBalance(obdex, bat, trader1);
-            expect(trader1Balance.free).to.be.equals(toEthUnit('0'));
-            expect(trader1Balance.locked).to.be.equals(toEthUnit('0'));
-            
             // Trader1 BUY 100 BAT for price of 3 DAI each => 300 DAI LOCKED
             await obdex.contract.connect(trader1)
                 .createLimitOrder(BAT, toEthUnit('100'), 3, ORDER_SIDE.BUY);
             
-            // Check Trader1 Locked DAI Balance 
-            trader1Balance = await getTraderBalance(obdex, dai, trader1);
-            expect(trader1Balance.free).to.be.equals(toEthUnit('700'));
-            expect(trader1Balance.locked).to.be.equals(toEthUnit('300'));
+            // Trader1 Balance DAI, BAT
+            assertTraderBalance(obdex, dai, trader1, '700', '300');
+            assertTraderBalance(obdex, bat, trader1, '0', '0');
 
             // Trader3 SELL 150 BAT for price of 3 DAI each => 150 DAI LOCKED
             await obdex.contract.connect(trader3)
-                .createLimitOrder(BAT, toEthUnit('150',), 3, ORDER_SIDE.SELL);
+                .createLimitOrder(BAT, toEthUnit('150'), 3, ORDER_SIDE.SELL);
 
-            // Check Trader3 New DAI Balance 
-            let trader3Balance = await getTraderBalance(obdex, dai, trader3);
-            expect(trader3Balance.free).to.be.equals(toEthUnit('300'));
-            expect(trader3Balance.locked).to.be.equals(toEthUnit('0'));
+            // Trader3 Balance DAI, BAT
+            assertTraderBalance(obdex, dai, trader3, '300', '0');
+            assertTraderBalance(obdex, bat, trader3, '850', '50');
 
-            // Check Trader3 New BAT Balance 
-            trader3Balance = await getTraderBalance(obdex, bat, trader3);
-            expect(trader3Balance.free).to.be.equals(toEthUnit('850'));
-            expect(trader3Balance.locked).to.be.equals(toEthUnit('50'));
-
-            // Check Trader1 New DAI Balance
-            trader1Balance = await getTraderBalance(obdex, dai, trader1);
-            expect(trader1Balance.free).to.be.equals(toEthUnit('700'));
-            expect(trader1Balance.locked).to.be.equals(toEthUnit('0'));
-            
-            // Check Trader1 New BAT Balance
-            trader1Balance = await getTraderBalance(obdex, bat, trader1);
-            expect(trader1Balance.free).to.be.equals(toEthUnit('100'));
-            expect(trader1Balance.locked).to.be.equals(toEthUnit('0'));
+            // Trader1 Balance DAI, BAT
+            assertTraderBalance(obdex, dai, trader1, '700', '0');
+            assertTraderBalance(obdex, bat, trader1, '100', '0');
             
             // Check BAT BUY Orders
             let buyOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.BUY);
@@ -610,52 +710,27 @@ describe('OBDex', () => {
             // Check BAT SELL Orders
             let sellOrders = await obdex.contract.getOrders(BAT, ORDER_SIDE.SELL);
             expect(sellOrders.length).to.be.equals(1);
-            expect(sellOrders[0].amount).to.be.equals(toEthUnit('150'));
-            expect(sellOrders[0].fills.length).to.be.equals(1);
-            expect(sellOrders[0].fills[0]).to.be.equals(toEthUnit('100'));
+            assertOrder(sellOrders[0], toEthUnit('150'), 3, trader3, ['100']);
 
-            // Check Trader3 REP Balance 
-            trader3Balance = await getTraderBalance(obdex, rep, trader3);
-            expect(trader3Balance.free).to.be.equals(toEthUnit('0'));
-            expect(trader3Balance.locked).to.be.equals(toEthUnit('0'));
-            
             // Trader3 BUY 10 REP for price of 10 DAI each => 100 DAI LOCKED
             await obdex.contract.connect(trader3)
                 .createLimitOrder(REP, toEthUnit('10'), 10, ORDER_SIDE.BUY);
             
-            // Check Trader3 Locked DAI Balance 
-            trader3Balance = await getTraderBalance(obdex, dai, trader3);
-            expect(trader3Balance.free).to.be.equals(toEthUnit('200'));
-            expect(trader3Balance.locked).to.be.equals(toEthUnit('100'));
-            
-            // Check Trader2 DAI Balance 
-            let trader2Balance = await getTraderBalance(obdex, dai, trader2);
-            expect(trader2Balance.free).to.be.equals(toEthUnit('0'));
-            expect(trader2Balance.locked).to.be.equals(toEthUnit('0'));
+            // Trader3 Balance DAI, REP
+            assertTraderBalance(obdex, dai, trader3, '300', '100');
+            assertTraderBalance(obdex, rep, trader3, '0', '0');
             
             // Trader2 SELL 100 REP for price of 10 DAI each => 100 REP LOCKED
             await obdex.contract.connect(trader2)
                 .createLimitOrder(REP, toEthUnit('100'), 10, ORDER_SIDE.SELL);
             
-            // Check Trader3 New DAI Balance 
-            trader3Balance = await getTraderBalance(obdex, dai, trader3);
-            expect(trader3Balance.free).to.be.equals(toEthUnit('200'));
-            expect(trader3Balance.locked).to.be.equals(toEthUnit('0'));
+            // Trader3 Balance DAI, REP
+            assertTraderBalance(obdex, dai, trader3, '200', '0');
+            assertTraderBalance(obdex, rep, trader3, '10', '0');
 
-            // Check Trader3 New REP Balance 
-            trader3Balance = await getTraderBalance(obdex, rep, trader3);
-            expect(trader3Balance.free).to.be.equals(toEthUnit('10'));
-            expect(trader3Balance.locked).to.be.equals(toEthUnit('0'));
-
-            // Check Trader2 New DAI Balance
-            trader2Balance = await getTraderBalance(obdex, dai, trader2);
-            expect(trader2Balance.free).to.be.equals(toEthUnit('100'));
-            expect(trader2Balance.locked).to.be.equals(toEthUnit('0'));
-            
-            // Check Trader2 New REP Balance
-            trader2Balance = await getTraderBalance(obdex, rep, trader2);
-            expect(trader2Balance.free).to.be.equals(toEthUnit('900'));
-            expect(trader2Balance.locked).to.be.equals(toEthUnit('90'));
+            // Trader3 Balance DAI, REP
+            assertTraderBalance(obdex, dai, trader2, '100', '0');
+            assertTraderBalance(obdex, rep, trader2, '900', '90');
 
             // Check REP BUY Orders
             buyOrders = await obdex.contract.getOrders(REP, ORDER_SIDE.BUY);
@@ -664,9 +739,7 @@ describe('OBDex', () => {
             // Check REP SELL Orders
             sellOrders = await obdex.contract.getOrders(REP, ORDER_SIDE.SELL);
             expect(sellOrders.length).to.be.equals(1);
-            expect(sellOrders[0].amount).to.be.equals(toEthUnit('100'));
-            expect(sellOrders[0].fills.length).to.be.equals(1);
-            expect(sellOrders[0].fills[0]).to.be.equals(toEthUnit('10'));
+            assertOrder(sellOrders[0], toEthUnit('100'), 10, trader2, ['10']);
         });
     });
 
