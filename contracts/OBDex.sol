@@ -144,12 +144,9 @@ contract OBDex {
         external newOrderModifier(_ticker, _amount, _side) ordersExists(_ticker, _side) {
         
         uint _amountToLock = deduceAmountToLock(_ticker, _amount, _side);
+
         uint price = deduceMarketPrice(_ticker, _side);
 
-        // The 'amount' should always be less than or equal to the '_amountToLock' variable before proceeding.
-        // This is because the '_amountToLock' variable represents the total amount of tokens being locked 
-        // and the 'amount' variable represents the amount of tokens being traded.
-        assert(_amount <= _amountToLock);
         if (_side == ORDER_SIDE.BUY) {            
             require(balances[msg.sender][DAI].free >= _amountToLock, "Low DAI Balance!");
         }  
@@ -158,7 +155,6 @@ contract OBDex {
         manageOrders(_ticker, _amount, price, _side, ORDER_TYPE.MARKET);
     }
 
-    // TBT
     // --- Cancle Order ---
     function cancelOrder(bytes32 _ticker, uint _orderId, ORDER_SIDE _side) 
         external {
@@ -269,7 +265,7 @@ contract OBDex {
         if (_side == ORDER_SIDE.SELL) {
             // SELL orders will be matched against Buy orders 
             // For the market buyers, the best price is the lowest price
-            // SORT SELL ORDERS BY PRICE [4, 5, 6]
+            // SORT SELL ORDERS BY ASCENDING PRICES [4, 5, 6]
             while(index > 0) {
                 if (orders[index - 1].price > orders[index].price) {
                     Order memory order = orders[index - 1];
@@ -281,7 +277,7 @@ contract OBDex {
         } else {
             // BUY orders will be matched against Sell orders 
             // For the market Sellers, the best price is the highest price
-            // SORT BUY ORDERS BY PRICE [3, 2, 1]
+            // SORT BUY ORDERS BY DESCENDING PRICES [3, 2, 1]
             while(index > 0) {
                 if (orders[index - 1].price < orders[index].price) {
                     Order memory order = orders[index - 1];
@@ -334,7 +330,6 @@ contract OBDex {
             }
 
             remaining = _orderToMatch.amount.sub(amountFilled(_orderToMatch));
-
             index = index.add(1);
         }
     }
@@ -343,12 +338,13 @@ contract OBDex {
     function matchSingleOrder(Order storage _orderToMatch, Order storage _oppositeOrder, uint _remaining) internal {
         // How much amount filled
         uint orderAmountFilled = amountFilled(_oppositeOrder);
-
+        
         // How much amount available
         uint available = SafeMath.sub(_oppositeOrder.amount, orderAmountFilled);
+        
         // How much amount matched
         uint matched = (_remaining > available) ? available : _remaining;
-
+        
         _oppositeOrder.fills.push(matched);
         _orderToMatch.fills.push(matched);
         adjustBalances(_orderToMatch, matched, _oppositeOrder);
