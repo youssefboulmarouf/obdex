@@ -266,14 +266,30 @@ contract OBDex {
         Order[] storage orders = orderBook[_ticker][uint(_side)];
         uint index = (orders.length > 0) ? (orders.length - 1) : 0;
         
-        // SORT BY PRICE
-        while(index > 0) {
-            if (orders[index - 1].price > orders[index].price) {
-                Order memory order = orders[index - 1];
-                orders[index - 1] = orders[index];
-                orders[index] = order;
+        if (_side == ORDER_SIDE.SELL) {
+            // SELL orders will be matched against Buy orders 
+            // For the market buyers, the best price is the lowest price
+            // SORT SELL ORDERS BY PRICE [4, 5, 6]
+            while(index > 0) {
+                if (orders[index - 1].price > orders[index].price) {
+                    Order memory order = orders[index - 1];
+                    orders[index - 1] = orders[index];
+                    orders[index] = order;
+                }
+                index = index.sub(1);       
             }
-            index = index.sub(1);       
+        } else {
+            // BUY orders will be matched against Sell orders 
+            // For the market Sellers, the best price is the highest price
+            // SORT BUY ORDERS BY PRICE [3, 2, 1]
+            while(index > 0) {
+                if (orders[index - 1].price < orders[index].price) {
+                    Order memory order = orders[index - 1];
+                    orders[index - 1] = orders[index];
+                    orders[index] = order;
+                }
+                index = index.sub(1);       
+            }
         }
     }
 
