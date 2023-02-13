@@ -19,7 +19,6 @@
   },
   "homepage": "https://github.com/youssefboulmarouf/obdex#readme",
   "devDependencies": {
-    "@openzeppelin/contracts": "^4.7.3",
     "@ethersproject/abi": "^5.7.0",
     "@ethersproject/providers": "^5.7.2",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.5",
@@ -27,6 +26,7 @@
     "@nomicfoundation/hardhat-toolbox": "^2.0.1",
     "@nomiclabs/hardhat-ethers": "^2.2.2",
     "@nomiclabs/hardhat-etherscan": "^3.1.5",
+    "@openzeppelin/contracts": "^4.7.3",
     "@typechain/ethers-v5": "^10.2.0",
     "@typechain/hardhat": "^6.1.5",
     "chai": "^4.3.7",
