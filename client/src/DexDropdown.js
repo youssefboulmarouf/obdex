@@ -1,16 +1,18 @@
 import React from 'react';
 
-function DexDropdown({onSelect, items}) {
+function DexDropdown({onSelect, tokens}) {
 
-    const selectItem = (item) => {
-        onSelect(item);
-        console.log("item: ", item);
+    console.log("Dropdown tokens : ", tokens)
+
+    const selectItem = (token) => {
+        console.log("Dropdown item: ", token);
+        onSelect(token);
     }
 
     return (
         <div>
             <select>
-                {items && items.map((item, i) => <option key={i} onClick={() => selectItem(item)}>{item.ticker}</option>)}
+                {tokens && tokens.map((token, i) => <option key={i} onClick={() => selectItem(token)}>{token.ticker}</option>)}
             </select>
         </div>
     );
