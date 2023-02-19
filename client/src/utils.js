@@ -11,12 +11,12 @@ const getWeb3 = () => {
             if (window.ethereum) {
                 const web3 = new Web3(window.ethereum);
                 try {
-                // Request account access if needed
-                await window.ethereum.enable();
-                // Acccounts now exposed
-                resolve(web3);
+                    // Request account access if needed
+                    await window.ethereum.enable();
+                    // Acccounts now exposed
+                    resolve(web3);
                 } catch (error) {
-                reject(error);
+                    reject(error);
                 }
             }
             // Legacy dapp browsers...
@@ -42,9 +42,9 @@ const getWeb3 = () => {
 const getContracts = async web3 => {
     // Read the contract address from the JSON file
     
-    const dex = initContract(web3, OBDex.abi, ca.adresses.OBDex);
+    const obdex = initContract(web3, OBDex.abi, ca.adresses.OBDex);
 
-    const tokens = await dex.methods.getTokens().call();
+    const tokens = await obdex.methods.getTokens().call();
 
     const tokenContracts = tokens.reduce((acc, token) => ({
         ...acc,
@@ -52,7 +52,7 @@ const getContracts = async web3 => {
     }), {});
 
 
-    return { dex, ...tokenContracts };
+    return { obdex, ...tokenContracts };
 }
 
 // Converts from bytes32 to ASCII (human readable)
