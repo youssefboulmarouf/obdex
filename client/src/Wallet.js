@@ -1,3 +1,4 @@
+import Web3 from 'web3';
 import React, { useState } from 'react';
 
 const DIRECTION = {
@@ -26,14 +27,14 @@ function Wallet({deposit, withdraw, user}) {
             <div className="form-group row">
                 <label htmlFor="wallet" className="col-sm-4 col-form-label">Wallet</label>
                 <div className="col-sm-8">
-                    <input className="form-control" id="wallet" disabled value={user.balances.tokenWallet}/>
+                    <input className="form-control" id="wallet" disabled value={Web3.utils.fromWei(user.balances.tokenWallet, 'ether')}/>
                 </div>
             </div>
             <div className="form-group row">
                 <label htmlFor="contract" className="col-sm-4 col-form-label">Dex</label>
                 <div className="col-sm-8">
-                    Free: <input className="form-control" id="wallet" disabled value={user.balances.tokenDex.free}/>
-                    Locked: <input className="form-control" id="wallet" disabled value={user.balances.tokenDex.locked}/>
+                    Free: <input className="form-control" id="wallet" disabled value={Web3.utils.fromWei(user.balances.tokenDex.free.toString(), 'ether')}/>
+                    Locked: <input className="form-control" id="wallet" disabled value={Web3.utils.fromWei(user.balances.tokenDex.locked.toString(), 'ether')}/>
                 </div>
             </div>
             
@@ -60,7 +61,7 @@ function Wallet({deposit, withdraw, user}) {
                     <label htmlFor="amount" className="col-sm-4 col-form-label">Amount</label>
                     <div className="col-sm-8">
                         <div className="input-group mb-3">
-                            <input id="amount" type="text" className="form-control" onChange={(e) => setAmount(e.target.value)}/>
+                            <input id="amount" type="text" className="form-control" onChange={(e) => setAmount(Web3.utils.toWei(e.target.value, 'ether'))}/>
                             <div className="input-group-append">
                                 <span className="input-group-text">{user.selectedToken.ticker}</span>
                             </div>
