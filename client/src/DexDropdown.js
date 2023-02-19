@@ -1,19 +1,23 @@
 import React from 'react';
+import Select from 'react-select'
 
 function DexDropdown({onSelect, tokens}) {
 
-    console.log("Dropdown tokens : ", tokens)
+    const options = [];
+    {tokens && tokens.map(token => options.push({value: token, label:token.ticker}))}
 
-    const selectItem = (token) => {
-        console.log("Dropdown item: ", token);
-        onSelect(token);
+    const selectItem = (event) => {
+        //console.log("Dropdown change event: ", event);
+        onSelect(event.value);
     }
 
     return (
         <div>
-            <select>
-                {tokens && tokens.map((token, i) => <option key={i} onClick={() => selectItem(token)}>{token.ticker}</option>)}
-            </select>
+            <Select 
+                defaultValue={{value: tokens[0], label:tokens[0].ticker}}
+                options={tokens && tokens.map(token => ({value: token, label:token.ticker}) )} 
+                onChange={(event) => selectItem(event)}
+            />
         </div>
     );
 }
