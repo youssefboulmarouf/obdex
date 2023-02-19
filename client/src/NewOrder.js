@@ -1,3 +1,4 @@
+import Web3 from 'web3';
 import React, { useState } from 'react';
 
 const SIDE = {BUY: 0, SELL: 1};
@@ -68,7 +69,7 @@ function NewOrder({createMarketOrder, createLimitOrder}) {
                         type="text" 
                         className="form-control" 
                         id="order-amount" 
-                        onChange={({ target: { value }}) => setOrder(order => ({ ...order, amount: value}))}
+                        onChange={({ target: { value }}) => setOrder(order => ({ ...order, amount: Web3.utils.toWei(value, 'ether')}))}
                         />
                     </div>
                 </div>
