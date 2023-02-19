@@ -4,8 +4,10 @@ require("@nomicfoundation/hardhat-toolbox");
 module.exports = {
   solidity: "0.8.17",
   networks: {
-    hardhat: {
-      allowUnlimitedContractSize: true
+    localhost: {
+      allowUnlimitedContractSize: true,
+      gas: 2000000,
+      gasPrice: 500000000
     }
   },
   paths: {

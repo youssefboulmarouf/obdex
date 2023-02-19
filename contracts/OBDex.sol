@@ -65,11 +65,6 @@ contract OBDex {
     // --- Contract Constructor ---
     constructor() { admin = msg.sender; }
 
-    // --- Checks If Adres Is Admin ---
-    function isAdmin(address _address) external view returns(bool) {
-        return _address == admin;
-    }
-
     // --- Add Token ---
     function addToken(bytes32 _ticker, address _tokenAddress) 
         external onlyAdmin() tokenDoesNotExist(_ticker) {
@@ -133,7 +128,7 @@ contract OBDex {
 
     // --- Create Limit Order ---
     function createLimitOrder(bytes32 _ticker, uint _amount, uint _price, ORDER_SIDE _side) 
-        external newOrderModifier(_ticker, _amount, _side) hasEnoughDaiToBuy(_amount, _price, _side) {
+        external tokenExist(_ticker) notDai(_ticker)hasEnoughTokenToSell(_ticker, _amount, _side) hasEnoughDaiToBuy(_amount, _price, _side) {
         
         lockUnlockTokens(_ticker, _amount, _price, _side, ORDER_TYPE.LIMIT, LOCKING.LOCK);
         manageOrders(_ticker, _amount, _price, _side, ORDER_TYPE.LIMIT);
@@ -141,7 +136,7 @@ contract OBDex {
 
     // --- Create Market Order ---
     function createMarketOrder(bytes32 _ticker, uint _amount, ORDER_SIDE _side) 
-        external newOrderModifier(_ticker, _amount, _side) ordersExists(_ticker, _side) {
+        external tokenExist(_ticker) notDai(_ticker) hasEnoughTokenToSell(_ticker, _amount, _side) ordersExists(_ticker, _side) {
         
         uint _amountToLock = deduceAmountToLock(_ticker, _amount, _side);
 
@@ -484,33 +479,33 @@ contract OBDex {
     }
 
     // --- Modifier: Token Should Exist ---
-    modifier tokenExist(bytes32 ticker) {
-        require(tokens[ticker].tokenAddress != address(0), "Ticker Does Not Exist!");
+    modifier tokenExist(bytes32 _ticker) {
+        require(tokens[_ticker].tokenAddress != address(0), "Ticker Does Not Exist!");
         _;
     }
 
     // --- Modifier: Token Should NOT Exist ---
-    modifier tokenDoesNotExist(bytes32 ticker) {
-        require(tokens[ticker].tokenAddress == address(0), "Ticker Already Exist!");
+    modifier tokenDoesNotExist(bytes32 _ticker) {
+        require(tokens[_ticker].tokenAddress == address(0), "Ticker Already Exist!");
         _;
     }
 
     // --- Modifier: Token Should Not Be DAI ---
-    modifier notDai(bytes32 ticker) {
-        require(ticker != DAI, "Cannot Trade DAI Token!");
+    modifier notDai(bytes32 _ticker) {
+        require(_ticker != DAI, "Cannot Trade DAI Token!");
         _;
     }
 
     // --- Modifier: Trader Should Have Enough Balance For Action ---
-    modifier hasEnoughBalance(bytes32 ticker, uint amount) {
-        require(balances[msg.sender][ticker].free >= amount, "Low Token Balance!");
+    modifier hasEnoughBalance(bytes32 _ticker, uint _amount) {
+        require(balances[msg.sender][_ticker].free >= _amount, "Low Token Balance!");
         _;
     }
 
     // --- Modifier: Trader Should Have Enough Token Balance To Sell ---
-    modifier hasEnoughTokenToSell(bytes32 ticker, uint amount, ORDER_SIDE side) {
-        if (side == ORDER_SIDE.SELL) {
-            require(balances[msg.sender][ticker].free >= amount, "Low Token Balance!");
+    modifier hasEnoughTokenToSell(bytes32 _ticker, uint _amount, ORDER_SIDE _side) {
+        if (_side == ORDER_SIDE.SELL) {
+            require(balances[msg.sender][_ticker].free >= _amount, "Low Token Balance!");
         }
         _;
     }
@@ -532,23 +527,6 @@ contract OBDex {
         // since we need opposite orders to exist for the matching to happen
         Order[] memory orders = orderBook[_ticker][uint(_side == ORDER_SIDE.BUY ? ORDER_SIDE.SELL : ORDER_SIDE.BUY)];
         require(orders.length > 0, "Empty Order Book! Please Create Limit Order!");
-        _;
-    }
-
-    modifier newOrderModifier(bytes32 _ticker, uint _amount, ORDER_SIDE _side) {
-        // THIS ORDER MODIFER IS TO AVOID THE `STACK TOO DEEP ERROR COMPILATION`
-        // IT HAPPENS WHEN THERE IS +5 MODIFIERS OR +16 FUNCTION PARAMETERS
-        
-        // --- Modifier: Token Should Exist ---
-        require(tokens[_ticker].tokenAddress != address(0), "Ticker Does Not Exist!");
-
-        // --- Modifier: Token Should Not Be DAI ---
-        require(_ticker != DAI, "Cannot Trade DAI Token!");
-
-        // --- Modifier: Trader Should Have Enough Token Balance To Sell ---        
-        if (_side == ORDER_SIDE.SELL) {
-            require(balances[msg.sender][_ticker].free >= _amount, "Low Token Balance!");
-        }
         _;
     }
 }

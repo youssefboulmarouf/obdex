@@ -2,6 +2,7 @@
 
 /src/contracts
 /src/artifacts
+/src/contract-addresses.json
 
 # dependencies
 /node_modules

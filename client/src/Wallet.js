@@ -1,4 +1,6 @@
+import Web3 from 'web3';
 import React, { useState } from 'react';
+import Balances from './Balances';
 
 const DIRECTION = {
     WITHDRAW: 'WITHDRAW',
@@ -22,21 +24,21 @@ function Wallet({deposit, withdraw, user}) {
         <div id="wallet" className="card">
             <h2 className="card-title">Wallet</h2>
 
-            <h3>Token balance for {user.selectedToken.ticker}</h3>
+            <h3>User: {user.account}</h3>
+            
             <div className="form-group row">
                 <label htmlFor="wallet" className="col-sm-4 col-form-label">Wallet</label>
                 <div className="col-sm-8">
-                    <input className="form-control" id="wallet" disabled value={user.balances.tokenWallet}/>
+                    <input className="form-control" id="wallet" disabled value={Web3.utils.fromWei(user.balances.tokenWallet, 'ether')}/>
                 </div>
             </div>
-            <div className="form-group row">
-                <label htmlFor="contract" className="col-sm-4 col-form-label">Dex</label>
-                <div className="col-sm-8">
-                    Free: <input className="form-control" id="wallet" disabled value={user.balances.tokenDex.free}/>
-                    Locked: <input className="form-control" id="wallet" disabled value={user.balances.tokenDex.locked}/>
-                </div>
-            </div>
-            
+
+            <Balances id="balances" ticker={user.selectedToken.ticker} free={user.balances.tokenDex.free} locked={user.balances.tokenDex.locked}/>
+            {(user.selectedToken.ticker !== 'DAI') ? 
+                
+                <Balances id="balances" ticker={'DAI'} free={user.balances.daiDex.free} locked={user.balances.daiDex.locked}/>
+            : null}
+
             <h3>Transfer {user.selectedToken.ticker}</h3>
             <form id="transfer" onSubmit={(e) => onSubmit(e)}>
                 <div className="form-group row">
@@ -60,7 +62,7 @@ function Wallet({deposit, withdraw, user}) {
                     <label htmlFor="amount" className="col-sm-4 col-form-label">Amount</label>
                     <div className="col-sm-8">
                         <div className="input-group mb-3">
-                            <input id="amount" type="text" className="form-control" onChange={(e) => setAmount(e.target.value)}/>
+                            <input id="amount" type="text" className="form-control" onChange={(e) => setAmount(Web3.utils.toWei(e.target.value, 'ether'))}/>
                             <div className="input-group-append">
                                 <span className="input-group-text">{user.selectedToken.ticker}</span>
                             </div>
