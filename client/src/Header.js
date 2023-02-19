@@ -18,7 +18,7 @@ function Header({contracts, tokens, selectToken}) {
                         <span className='contract-address'>
                             Contract Address: 
                             <span className='address'>
-                                {contracts.dex.options.address}
+                                {contracts.obdex.options.address}
                             </span>
                         </span>
                     </h1>
